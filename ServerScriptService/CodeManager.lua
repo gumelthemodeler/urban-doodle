@@ -26,9 +26,12 @@ local ActiveCodes = {
 			["Titan Research Notes"] = 1,
 		}
 	}, 
-	["67PLAYERS"] = { 
-		TitanXP = 500,
-		Dews = 1500,
+	["MULTIPLAYER"] = { 
+		Dews = 3500,
+		Items = {
+			["Standard Titan Serum"] = 15,
+			["Clan Blood Vial"] = 10,
+		}
 	},
 	["PRESTIGEFIX"] = { 
 		XP = 1500,
