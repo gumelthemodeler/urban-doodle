@@ -109,7 +109,6 @@ else
 	ContentFrame.Size = UDim2.new(1, -160, 1, -70); ContentFrame.Position = UDim2.new(0, 145, 0, 60)
 end
 
--- [[ FIXED: Added PVP to Operations Menu ]]
 local NavStructure = {
 	["PLAYER"] = { {Id="Profile", Name="PROFILE"}, {Id="Stats", Name="STATS"}, {Id="Inherit", Name="INHERIT"} },
 	["OPERATIONS"] = { {Id="Battle", Name="COMBAT"}, {Id="Bounties", Name="BOUNTIES"}, {Id="Dispatch", Name="EXPEDITIONS"}, {Id="PVP", Name="PVP"} },
@@ -122,6 +121,9 @@ local CategoryIcons = { ["PLAYER"] = "rbxassetid://106161709171988", ["OPERATION
 
 local ActiveCategory = nil; local ActiveTab = nil; local TabModules = {}; local SubButtons = {}
 local CategoryCallbacks = {}
+
+-- [[ THE FIX: Define Admin Check Early ]]
+local isAdmin = (player.UserId == 4068160397 or player.Name == "girthbender1209")
 
 local function SwitchTab(tabName)
 	if ActiveTab == tabName then return end; ActiveTab = tabName
@@ -139,7 +141,6 @@ local function SwitchTab(tabName)
 	for _, child in ipairs(ContentFrame:GetChildren()) do if child:IsA("Frame") or child:IsA("ScrollingFrame") then child.Visible = false end end
 	if AOT_Interface:FindFirstChild("TradeOverlay") then AOT_Interface.TradeOverlay.Visible = false end
 
-	-- [[ FIXED: Safely hide the custom PvP UI when switching tabs ]]
 	if player.PlayerGui:FindFirstChild("PvPGui") then 
 		player.PlayerGui.PvPGui.MainFrame.Visible = false 
 	end
@@ -231,13 +232,15 @@ local function BuildNavigation()
 		catBtn.MouseButton1Click:Connect(CategoryCallbacks[catName])
 	end
 
-	-- Removed the 'if' restriction to allow all players to see the Tester button
-	local adminBtn = Instance.new("TextButton", NavBar)
-	adminBtn.Name = "AdminBtn"; adminBtn.Size = isMobile and UDim2.new(0, 90, 1, -15) or UDim2.new(1, -15, 0, 45)
-	adminBtn.Font = Enum.Font.GothamBlack; adminBtn.TextColor3 = Color3.fromRGB(255, 100, 100); adminBtn.TextScaled = true; adminBtn.Text = "TESTER"; Instance.new("UITextSizeConstraint", adminBtn).MaxTextSize = 12
-	ApplyButtonGradient(adminBtn, Color3.fromRGB(80, 30, 30), Color3.fromRGB(40, 15, 15), Color3.fromRGB(150, 50, 50))
-	table.insert(SubButtons, adminBtn)
-	adminBtn.MouseButton1Click:Connect(function() SwitchTab("Admin") end)
+	-- [[ THE FIX: Wrap Admin Button inside isAdmin check ]]
+	if isAdmin then
+		local adminBtn = Instance.new("TextButton", NavBar)
+		adminBtn.Name = "AdminBtn"; adminBtn.Size = isMobile and UDim2.new(0, 90, 1, -15) or UDim2.new(1, -15, 0, 45)
+		adminBtn.Font = Enum.Font.GothamBlack; adminBtn.TextColor3 = Color3.fromRGB(255, 100, 100); adminBtn.TextScaled = true; adminBtn.Text = "TESTER"; Instance.new("UITextSizeConstraint", adminBtn).MaxTextSize = 12
+		ApplyButtonGradient(adminBtn, Color3.fromRGB(80, 30, 30), Color3.fromRGB(40, 15, 15), Color3.fromRGB(150, 50, 50))
+		table.insert(SubButtons, adminBtn)
+		adminBtn.MouseButton1Click:Connect(function() SwitchTab("Admin") end)
+	end
 end
 
 BuildNavigation()
@@ -296,16 +299,17 @@ task.spawn(function()
 		TabModules["Dispatch"] = require(uiModulesFolder:WaitForChild("DispatchTab")); TabModules["Dispatch"].Init(ContentFrame, TooltipManager)
 		TabModules["Combat"] = require(uiModulesFolder:WaitForChild("CombatTab")); TabModules["Combat"].Init(ContentFrame, TooltipManager)
 
-		-- [[ STANDARD INITIALIZATION ]]
 		TabModules["PVP"] = require(uiModulesFolder:WaitForChild("PVPTab"))
 		TabModules["PVP"].Init(ContentFrame, TooltipManager)
 		TabModules["RaidCombat"] = require(uiModulesFolder:WaitForChild("RaidTab"))
 		TabModules["RaidCombat"].Init(ContentFrame, TooltipManager)
 
-		pcall(function()
-			-- Removed whitelist check so the module initializes for everyone
-			TabModules["Admin"] = require(rootModules:WaitForChild("AdminTab")); TabModules["Admin"].Init(ContentFrame)
-		end)
+		-- [[ THE FIX: Wrap Admin Tab Require in isAdmin check ]]
+		if isAdmin then
+			pcall(function()
+				TabModules["Admin"] = require(rootModules:WaitForChild("AdminTab")); TabModules["Admin"].Init(ContentFrame)
+			end)
+		end
 
 		local WelcomeHub = require(uiModulesFolder:WaitForChild("WelcomeHub"))
 		WelcomeHub.Init(ContentFrame)
