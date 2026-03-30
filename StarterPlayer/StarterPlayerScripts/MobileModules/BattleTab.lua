@@ -9,6 +9,7 @@ local Network = ReplicatedStorage:WaitForChild("Network")
 local EnemyData = require(ReplicatedStorage:WaitForChild("EnemyData"))
 
 local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 local MainFrame
 local ContentArea
 local SubTabs = {}
@@ -18,6 +19,15 @@ local rBtns = {}
 local CompletionBanner
 
 local pBtn, pStats
+
+-- [[ THE FIX: Require the Notification Manager ]]
+local NotificationManager = require(script.Parent.Parent:WaitForChild("UIModules"):WaitForChild("NotificationManager"))
+
+-- [[ PARTY VARIABLES ]]
+local PartyListFrame, ServerListFrame, PartyActionBtn, PartyTitle
+local inParty = false
+local isLeader = true
+local currentPartyData = {}
 
 local expeditionList = {
 	{ Id = 1, Name = "The Fall of Shiganshina", Req = 0, Desc = "The breach of Wall Maria. Survival is the only objective." },
@@ -75,6 +85,99 @@ local function TweenGradient(grad, targetTop, targetBot, duration)
 	tween:Play(); tween.Completed:Connect(function() val:Destroy() end)
 end
 
+local function RefreshServerList()
+	if not ServerListFrame then return end
+	for _, child in ipairs(ServerListFrame:GetChildren()) do if child:IsA("Frame") then child:Destroy() end end
+
+	local count = 0
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= player then
+			count += 1
+			local row = Instance.new("Frame", ServerListFrame)
+			row.Size = UDim2.new(1, -10, 0, 40); row.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+			Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+			local stroke = Instance.new("UIStroke", row); stroke.Color = Color3.fromRGB(50, 50, 60); stroke.Thickness = 1; stroke.Transparency = 0.55
+
+			local avatar = Instance.new("ImageLabel", row)
+			avatar.Size = UDim2.new(0, 30, 0, 30); avatar.Position = UDim2.new(0, 5, 0.5, 0); avatar.AnchorPoint = Vector2.new(0, 0.5); avatar.BackgroundColor3 = Color3.fromRGB(15, 15, 20); avatar.Image = "rbxthumb://type=AvatarHeadShot&id="..p.UserId.."&w=150&h=150"
+			Instance.new("UICorner", avatar).CornerRadius = UDim.new(0, 6)
+
+			local nLbl = Instance.new("TextLabel", row)
+			nLbl.Size = UDim2.new(1, -120, 1, 0); nLbl.Position = UDim2.new(0, 45, 0, 0); nLbl.BackgroundTransparency = 1; nLbl.Font = Enum.Font.GothamBlack; nLbl.TextColor3 = Color3.fromRGB(230, 230, 240); nLbl.TextSize = 12; nLbl.TextXAlignment = Enum.TextXAlignment.Left; nLbl.Text = string.upper(p.Name)
+
+			local invBtn = Instance.new("TextButton", row)
+			invBtn.Size = UDim2.new(0, 65, 0, 25); invBtn.Position = UDim2.new(1, -5, 0.5, 0); invBtn.AnchorPoint = Vector2.new(1, 0.5); invBtn.Font = Enum.Font.GothamBlack; invBtn.TextColor3 = Color3.fromRGB(255, 255, 255); invBtn.TextSize = 10; invBtn.Text = "INVITE"
+
+			if inParty and isLeader then
+				ApplyButtonGradient(invBtn, Color3.fromRGB(40, 140, 80), Color3.fromRGB(20, 80, 40), Color3.fromRGB(60, 180, 100))
+				invBtn.MouseButton1Click:Connect(function()
+					Network.PartyAction:FireServer("Invite", p.Name)
+					invBtn.Text = "SENT"; invBtn.TextColor3 = Color3.fromRGB(150, 255, 150)
+					ApplyButtonGradient(invBtn, Color3.fromRGB(25, 35, 25), Color3.fromRGB(15, 20, 15), Color3.fromRGB(80, 180, 80))
+					task.delay(3, function() 
+						if invBtn and invBtn.Parent then
+							invBtn.Text = "INVITE"; invBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+							ApplyButtonGradient(invBtn, Color3.fromRGB(40, 140, 80), Color3.fromRGB(20, 80, 40), Color3.fromRGB(60, 180, 100))
+						end
+					end)
+				end)
+			else
+				ApplyButtonGradient(invBtn, Color3.fromRGB(40, 40, 45), Color3.fromRGB(20, 20, 25), Color3.fromRGB(60, 60, 70))
+				invBtn.TextColor3 = Color3.fromRGB(120, 120, 120)
+				invBtn.MouseButton1Click:Connect(function()
+					-- [[ THE FIX: Use NotificationManager locally ]]
+					if NotificationManager then NotificationManager.Show("Only the Party Leader can invite.", "Error") end
+				end)
+			end
+		end
+	end
+	task.delay(0.05, function() ServerListFrame.CanvasSize = UDim2.new(0, 0, 0, count * 45 + 10) end)
+end
+
+local function UpdatePartyUI(partyData)
+	if not PartyListFrame or not PartyTitle or not PartyActionBtn then return end
+	currentPartyData = partyData
+
+	if not partyData or #partyData == 0 then
+		inParty = false; isLeader = true
+		PartyTitle.Text = "RAID SQUAD (0/3)"
+		PartyActionBtn.Text = "CREATE SQUAD"
+		ApplyButtonGradient(PartyActionBtn, Color3.fromRGB(40, 140, 80), Color3.fromRGB(20, 80, 40), Color3.fromRGB(60, 180, 100))
+		for _, child in ipairs(PartyListFrame:GetChildren()) do if child:IsA("Frame") then child:Destroy() end end
+		RefreshServerList()
+		return
+	end
+
+	inParty = true
+	isLeader = false
+	for _, mem in ipairs(partyData) do if mem.UserId == player.UserId and mem.IsLeader then isLeader = true end end
+
+	PartyTitle.Text = "RAID SQUAD (" .. #partyData .. "/3)"
+	PartyActionBtn.Text = isLeader and "DISBAND SQUAD" or "LEAVE SQUAD"
+	ApplyButtonGradient(PartyActionBtn, Color3.fromRGB(160, 60, 60), Color3.fromRGB(80, 30, 30), Color3.fromRGB(200, 80, 80))
+	RefreshServerList() 
+
+	for _, child in ipairs(PartyListFrame:GetChildren()) do if child:IsA("Frame") then child:Destroy() end end
+
+	for _, mem in ipairs(partyData) do
+		local row = Instance.new("Frame", PartyListFrame)
+		row.Size = UDim2.new(1, -10, 0, 45); row.BackgroundColor3 = mem.IsLeader and Color3.fromRGB(40, 30, 20) or Color3.fromRGB(25, 25, 30)
+		Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+		local stroke = Instance.new("UIStroke", row); stroke.Color = mem.IsLeader and Color3.fromRGB(255, 215, 100) or Color3.fromRGB(60, 60, 70); stroke.Thickness = 2
+
+		local avatar = Instance.new("ImageLabel", row)
+		avatar.Size = UDim2.new(0, 35, 0, 35); avatar.Position = UDim2.new(0, 5, 0.5, 0); avatar.AnchorPoint = Vector2.new(0, 0.5); avatar.BackgroundColor3 = Color3.fromRGB(15, 15, 20); avatar.Image = "rbxthumb://type=AvatarHeadShot&id="..mem.UserId.."&w=150&h=150"
+		Instance.new("UICorner", avatar).CornerRadius = UDim.new(0, 6)
+
+		local nLbl = Instance.new("TextLabel", row)
+		nLbl.Size = UDim2.new(1, -55, 0, 20); nLbl.Position = UDim2.new(0, 50, 0, 2); nLbl.BackgroundTransparency = 1; nLbl.Font = Enum.Font.GothamBlack; nLbl.TextColor3 = Color3.fromRGB(255, 255, 255); nLbl.TextSize = 13; nLbl.TextXAlignment = Enum.TextXAlignment.Left; nLbl.Text = string.upper(mem.Name)
+
+		local statLbl = Instance.new("TextLabel", row)
+		statLbl.Size = UDim2.new(1, -55, 0, 15); statLbl.Position = UDim2.new(0, 50, 0, 22); statLbl.BackgroundTransparency = 1; statLbl.Font = Enum.Font.GothamBold; statLbl.TextColor3 = mem.IsLeader and Color3.fromRGB(255, 215, 100) or Color3.fromRGB(150, 150, 180); statLbl.TextSize = 10; statLbl.TextXAlignment = Enum.TextXAlignment.Left; statLbl.Text = mem.IsLeader and "PARTY LEADER" or "MEMBER"
+	end
+	task.delay(0.05, function() PartyListFrame.CanvasSize = UDim2.new(0, 0, 0, #partyData * 50 + 10) end)
+end
+
 function BattleTab.Init(parentFrame)
 	MainFrame = Instance.new("Frame", parentFrame)
 	MainFrame.Name = "BattleFrame"; MainFrame.Size = UDim2.new(1, 0, 1, 0); MainFrame.BackgroundTransparency = 1; MainFrame.Visible = false
@@ -124,6 +227,7 @@ function BattleTab.Init(parentFrame)
 	CreateSubNavBtn("Raids", "MULTIPLAYER RAIDS")
 	CreateSubNavBtn("World", "WORLD BOSSES")
 
+	-- [[ CAMPAIGN TAB ]]
 	SubTabs["Campaign"] = Instance.new("ScrollingFrame", ContentArea)
 	SubTabs["Campaign"].Size = UDim2.new(1, 0, 1, 0); SubTabs["Campaign"].BackgroundTransparency = 1; SubTabs["Campaign"].BorderSizePixel = 0; SubTabs["Campaign"].ScrollBarThickness = 0; SubTabs["Campaign"].Visible = true
 	local cListLayout = Instance.new("UIListLayout", SubTabs["Campaign"]); cListLayout.Padding = UDim.new(0, 10); cListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; cListLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -161,6 +265,7 @@ function BattleTab.Init(parentFrame)
 		cBtns[dInfo.Id] = { Btn = btn, Stroke = stroke, Accent = accentBar }
 	end
 
+	-- [[ ENDLESS TAB ]]
 	SubTabs["Endless"] = Instance.new("ScrollingFrame", ContentArea)
 	SubTabs["Endless"].Size = UDim2.new(1, 0, 1, 0); SubTabs["Endless"].BackgroundTransparency = 1; SubTabs["Endless"].Visible = false; SubTabs["Endless"].ScrollBarThickness = 0
 	SubTabs["Endless"].AutomaticCanvasSize = Enum.AutomaticSize.Y
@@ -185,6 +290,7 @@ function BattleTab.Init(parentFrame)
 
 	eBtn.MouseButton1Click:Connect(function() Network:WaitForChild("CombatAction"):FireServer("EngageEndless") end)
 
+	-- [[ PATHS TAB ]]
 	SubTabs["Paths"] = Instance.new("ScrollingFrame", ContentArea)
 	SubTabs["Paths"].Size = UDim2.new(1, 0, 1, 0); SubTabs["Paths"].BackgroundTransparency = 1; SubTabs["Paths"].Visible = false; SubTabs["Paths"].ScrollBarThickness = 0
 	local pathsLayout = Instance.new("UIListLayout", SubTabs["Paths"]); pathsLayout.FillDirection = Enum.FillDirection.Vertical; pathsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; pathsLayout.Padding = UDim.new(0, 15)
@@ -216,13 +322,67 @@ function BattleTab.Init(parentFrame)
 
 	pathsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() SubTabs["Paths"].CanvasSize = UDim2.new(0, 0, 0, pathsLayout.AbsoluteContentSize.Y + 30) end)
 
-	SubTabs["Raids"] = Instance.new("ScrollingFrame", ContentArea)
-	SubTabs["Raids"].Size = UDim2.new(1, 0, 1, 0); SubTabs["Raids"].BackgroundTransparency = 1; SubTabs["Raids"].BorderSizePixel = 0; SubTabs["Raids"].ScrollBarThickness = 0; SubTabs["Raids"].Visible = false
-	local rListLayout = Instance.new("UIListLayout", SubTabs["Raids"]); rListLayout.Padding = UDim.new(0, 10); rListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; rListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	local rPad = Instance.new("UIPadding", SubTabs["Raids"]); rPad.PaddingTop = UDim.new(0, 10); rPad.PaddingBottom = UDim.new(0, 20)
+	-- [[ RAIDS TAB WITH EXPLICIT INVITE BOX ]]
+	SubTabs["Raids"] = Instance.new("Frame", ContentArea)
+	SubTabs["Raids"].Size = UDim2.new(1, 0, 1, 0); SubTabs["Raids"].BackgroundTransparency = 1; SubTabs["Raids"].Visible = false
+
+	local PartyPanel = Instance.new("Frame", SubTabs["Raids"])
+	PartyPanel.Size = UDim2.new(0.48, 0, 1, -20); PartyPanel.Position = UDim2.new(0.01, 0, 0, 10); PartyPanel.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+	Instance.new("UICorner", PartyPanel).CornerRadius = UDim.new(0, 8); Instance.new("UIStroke", PartyPanel).Color = Color3.fromRGB(80, 50, 50); PartyPanel.UIStroke.Thickness = 2
+
+	PartyTitle = Instance.new("TextLabel", PartyPanel)
+	PartyTitle.Size = UDim2.new(1, 0, 0, 30); PartyTitle.BackgroundTransparency = 1; PartyTitle.Font = Enum.Font.GothamBlack; PartyTitle.TextColor3 = Color3.fromRGB(255, 215, 100); PartyTitle.TextSize = 14; PartyTitle.Text = " RAID SQUAD (0/3)"
+
+	PartyListFrame = Instance.new("ScrollingFrame", PartyPanel)
+	PartyListFrame.Size = UDim2.new(1, 0, 0.35, 0); PartyListFrame.Position = UDim2.new(0, 0, 0, 30); PartyListFrame.BackgroundTransparency = 1; PartyListFrame.ScrollBarThickness = 2; PartyListFrame.BorderSizePixel = 0
+	local pLayout = Instance.new("UIListLayout", PartyListFrame); pLayout.Padding = UDim.new(0, 5); pLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local pPad = Instance.new("UIPadding", PartyListFrame); pPad.PaddingTop = UDim.new(0, 5)
+
+	local srvTitle = Instance.new("TextLabel", PartyPanel)
+	srvTitle.Size = UDim2.new(1, 0, 0, 20); srvTitle.Position = UDim2.new(0, 0, 0.35, 35); srvTitle.BackgroundTransparency = 1; srvTitle.Font = Enum.Font.GothamBlack; srvTitle.TextColor3 = Color3.fromRGB(150, 200, 255); srvTitle.TextSize = 14; srvTitle.Text = " INVITE PLAYER"
+
+	local InviteBoxContainer = Instance.new("Frame", PartyPanel)
+	InviteBoxContainer.Size = UDim2.new(1, -16, 0, 35); InviteBoxContainer.Position = UDim2.new(0, 8, 0.35, 70); InviteBoxContainer.BackgroundTransparency = 1
+
+	local InviteBox = Instance.new("TextBox", InviteBoxContainer)
+	InviteBox.Size = UDim2.new(0.7, -5, 1, 0); InviteBox.BackgroundColor3 = Color3.fromRGB(10, 10, 12); InviteBox.Font = Enum.Font.GothamMedium; InviteBox.TextColor3 = Color3.fromRGB(255, 255, 255); InviteBox.TextSize = 14; InviteBox.PlaceholderText = "Enter Username..."; InviteBox.Text = ""
+	Instance.new("UICorner", InviteBox).CornerRadius = UDim.new(0, 4); Instance.new("UIStroke", InviteBox).Color = Color3.fromRGB(50, 50, 60)
+
+	local InviteSendBtn = Instance.new("TextButton", InviteBoxContainer)
+	InviteSendBtn.Size = UDim2.new(0.3, 0, 1, 0); InviteSendBtn.Position = UDim2.new(0.7, 5, 0, 0); InviteSendBtn.Font = Enum.Font.GothamBlack; InviteSendBtn.TextSize = 13; InviteSendBtn.Text = "SEND"
+	ApplyButtonGradient(InviteSendBtn, Color3.fromRGB(40, 140, 80), Color3.fromRGB(20, 80, 40), Color3.fromRGB(60, 180, 100)); InviteSendBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+	InviteSendBtn.MouseButton1Click:Connect(function()
+		if inParty and isLeader then
+			if InviteBox.Text ~= "" then
+				Network.PartyAction:FireServer("Invite", InviteBox.Text)
+				InviteBox.Text = ""
+			end
+		else
+			-- [[ THE FIX: Use NotificationManager locally ]]
+			if NotificationManager then NotificationManager.Show("Only the Party Leader can invite.", "Error") end
+		end
+	end)
+
+	ServerListFrame = Instance.new("ScrollingFrame", PartyPanel)
+	ServerListFrame.Size = UDim2.new(1, 0, 0.65, -145); ServerListFrame.Position = UDim2.new(0, 0, 0.35, 95); ServerListFrame.BackgroundTransparency = 1; ServerListFrame.ScrollBarThickness = 2; ServerListFrame.BorderSizePixel = 0
+	local sLayout = Instance.new("UIListLayout", ServerListFrame); sLayout.Padding = UDim.new(0, 5); sLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local sPad = Instance.new("UIPadding", ServerListFrame); sPad.PaddingTop = UDim.new(0, 5)
+
+	PartyActionBtn = Instance.new("TextButton", PartyPanel)
+	PartyActionBtn.Size = UDim2.new(0.9, 0, 0, 35); PartyActionBtn.Position = UDim2.new(0.05, 0, 1, -40); PartyActionBtn.Font = Enum.Font.GothamBlack; PartyActionBtn.TextColor3 = Color3.fromRGB(255, 255, 255); PartyActionBtn.TextSize = 12; PartyActionBtn.Text = "CREATE SQUAD"
+	ApplyButtonGradient(PartyActionBtn, Color3.fromRGB(40, 100, 160), Color3.fromRGB(20, 50, 80), Color3.fromRGB(60, 140, 220))
+	PartyActionBtn.MouseButton1Click:Connect(function()
+		if inParty then Network.PartyAction:FireServer("Leave") else Network.PartyAction:FireServer("Create") end
+	end)
+
+	local BossPanel = Instance.new("ScrollingFrame", SubTabs["Raids"])
+	BossPanel.Size = UDim2.new(0.48, 0, 1, 0); BossPanel.Position = UDim2.new(0.51, 0, 0, 0); BossPanel.BackgroundTransparency = 1; BossPanel.BorderSizePixel = 0; BossPanel.ScrollBarThickness = 0
+	local rListLayout = Instance.new("UIListLayout", BossPanel); rListLayout.Padding = UDim.new(0, 10); rListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; rListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	local rPad = Instance.new("UIPadding", BossPanel); rPad.PaddingTop = UDim.new(0, 10); rPad.PaddingBottom = UDim.new(0, 20)
 
 	for _, rInfo in ipairs(raidList) do
-		local card = Instance.new("Frame", SubTabs["Raids"])
+		local card = Instance.new("Frame", BossPanel)
 		card.Size = UDim2.new(0.95, 0, 0, 105); card.BackgroundColor3 = Color3.fromRGB(20, 20, 25); card.LayoutOrder = rInfo.Req
 		Instance.new("UICorner", card).CornerRadius = UDim.new(0, 6)
 		local stroke = Instance.new("UIStroke", card); stroke.Color = Color3.fromRGB(60, 50, 50); stroke.Thickness = 1.5; stroke.Transparency = 0.5; stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
@@ -238,14 +398,17 @@ function BattleTab.Init(parentFrame)
 		desc.Font = Enum.Font.GothamMedium; desc.TextColor3 = Color3.fromRGB(180, 170, 170); desc.TextSize = 11; desc.TextWrapped = true; desc.TextXAlignment = Enum.TextXAlignment.Left; desc.TextYAlignment = Enum.TextYAlignment.Top; desc.Text = rInfo.Desc
 
 		local btn = Instance.new("TextButton", card)
-		btn.Size = UDim2.new(0.4, 0, 0, 28); btn.AnchorPoint = Vector2.new(1, 0); btn.Position = UDim2.new(1, -10, 1, -35)
-		btn.Font = Enum.Font.GothamBlack; btn.TextColor3 = Color3.fromRGB(255, 100, 100); btn.TextSize = 11; btn.Text = "HOST LOBBY"
-		ApplyButtonGradient(btn, Color3.fromRGB(35, 20, 20), Color3.fromRGB(20, 10, 10), Color3.fromRGB(180, 60, 60))
+		btn.Size = UDim2.new(0.45, 0, 0, 28); btn.AnchorPoint = Vector2.new(1, 0); btn.Position = UDim2.new(1, -10, 1, -35)
+		btn.Font = Enum.Font.GothamBlack; btn.TextColor3 = Color3.fromRGB(255, 100, 100); btn.TextSize = 11; btn.Text = "DEPLOY SQUAD"
+		ApplyButtonGradient(btn, Color3.fromRGB(40, 25, 25), Color3.fromRGB(25, 15, 15), Color3.fromRGB(180, 60, 60))
 
-		btn.MouseButton1Click:Connect(function() if btn.Active then Network:WaitForChild("RaidAction"):FireServer("CreateLobby", {RaidId = rInfo.Id, FriendsOnly = false}) end end)
+		btn.MouseButton1Click:Connect(function() 
+			if btn.Active then Network:WaitForChild("RaidAction"):FireServer("DeployParty", {RaidId = rInfo.Id}) end 
+		end)
 		rBtns[rInfo.Id] = { Btn = btn, Req = rInfo.Req, Stroke = stroke, Accent = accentBar }
 	end
 
+	-- [[ WORLD BOSS TAB ]]
 	SubTabs["World"] = Instance.new("ScrollingFrame", ContentArea)
 	SubTabs["World"].Size = UDim2.new(1, 0, 1, 0); SubTabs["World"].BackgroundTransparency = 1; SubTabs["World"].BorderSizePixel = 0; SubTabs["World"].ScrollBarThickness = 0; SubTabs["World"].Visible = false
 	local wListLayout = Instance.new("UIListLayout", SubTabs["World"]); wListLayout.Padding = UDim.new(0, 10); wListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; wListLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -328,13 +491,13 @@ function BattleTab.Init(parentFrame)
 				data.Stroke.Color = Color3.fromRGB(40, 40, 50); data.Accent.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
 			else
 				ApplyButtonGradient(data.Btn, Color3.fromRGB(40, 25, 25), Color3.fromRGB(25, 15, 15), Color3.fromRGB(180, 60, 60))
-				data.Btn.Text = "HOST LOBBY"; data.Btn.TextColor3 = Color3.fromRGB(255, 150, 150); data.Btn.Active = true
+				data.Btn.Text = "DEPLOY SQUAD"; data.Btn.TextColor3 = Color3.fromRGB(255, 150, 150); data.Btn.Active = true
 				data.Stroke.Color = Color3.fromRGB(100, 50, 50); data.Accent.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
 			end
 		end
 
 		task.delay(0.05, function() SubTabs["Campaign"].CanvasSize = UDim2.new(0, 0, 0, cListLayout.AbsoluteContentSize.Y + 40) end)
-		task.delay(0.05, function() SubTabs["Raids"].CanvasSize = UDim2.new(0, 0, 0, rListLayout.AbsoluteContentSize.Y + 40) end)
+		task.delay(0.05, function() BossPanel.CanvasSize = UDim2.new(0, 0, 0, rListLayout.AbsoluteContentSize.Y + 40) end)
 		task.delay(0.05, function() SubTabs["World"].CanvasSize = UDim2.new(0, 0, 0, wListLayout.AbsoluteContentSize.Y + 40) end)
 	end
 
@@ -368,6 +531,42 @@ function BattleTab.Init(parentFrame)
 			if pGrad then TweenGradient(pGrad, Color3.fromRGB(200, 150, 40), Color3.fromRGB(120, 80, 15), 0) end
 			TweenService:Create(SubBtns["Paths"], TweenInfo.new(0), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 		end
+	end)
+
+	-- [[ PARTY NETWORK LISTENERS & POPUP ]]
+	Network:WaitForChild("PartyUpdate").OnClientEvent:Connect(function(action, data)
+		if action == "UpdateList" then
+			UpdatePartyUI(data)
+		elseif action == "Disbanded" then
+			UpdatePartyUI({})
+		elseif action == "IncomingInvite" then
+			local senderName = data
+			local AOT_UI = playerGui:WaitForChild("AOT_Interface", 5)
+			if not AOT_UI or AOT_UI:FindFirstChild("PartyInvite_" .. senderName) then return end
+
+			local prompt = Instance.new("Frame", AOT_UI)
+			prompt.Name = "PartyInvite_" .. senderName; prompt.Size = UDim2.new(0, 300, 0, 120); prompt.Position = UDim2.new(0.5, 0, 0.85, 0); prompt.AnchorPoint = Vector2.new(0.5, 0.5); prompt.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+			Instance.new("UICorner", prompt).CornerRadius = UDim.new(0, 8); local stroke = Instance.new("UIStroke", prompt); stroke.Color = Color3.fromRGB(150, 200, 255); stroke.Thickness = 2
+
+			local lbl = Instance.new("TextLabel", prompt)
+			lbl.Size = UDim2.new(1, 0, 0, 50); lbl.BackgroundTransparency = 1; lbl.Font = Enum.Font.GothamBlack; lbl.TextColor3 = Color3.fromRGB(255, 255, 255); lbl.TextSize = 14; lbl.Text = senderName .. " invited you to a Raid Squad!"
+
+			local accBtn = Instance.new("TextButton", prompt)
+			accBtn.Size = UDim2.new(0.4, 0, 0, 40); accBtn.Position = UDim2.new(0.05, 0, 1, -50); accBtn.Font = Enum.Font.GothamBlack; accBtn.TextColor3 = Color3.fromRGB(150, 255, 150); accBtn.Text = "ACCEPT"; accBtn.TextSize = 14
+			ApplyButtonGradient(accBtn, Color3.fromRGB(20, 40, 20), Color3.fromRGB(10, 20, 10), Color3.fromRGB(80, 180, 80))
+
+			local decBtn = Instance.new("TextButton", prompt)
+			decBtn.Size = UDim2.new(0.4, 0, 0, 40); decBtn.Position = UDim2.new(0.55, 0, 1, -50); decBtn.Font = Enum.Font.GothamBlack; decBtn.TextColor3 = Color3.fromRGB(255, 150, 150); decBtn.Text = "DECLINE"; decBtn.TextSize = 14
+			ApplyButtonGradient(decBtn, Color3.fromRGB(40, 20, 20), Color3.fromRGB(20, 10, 10), Color3.fromRGB(180, 80, 80))
+
+			accBtn.MouseButton1Click:Connect(function() Network.PartyAction:FireServer("AcceptInvite", senderName); prompt:Destroy() end)
+			decBtn.MouseButton1Click:Connect(function() prompt:Destroy() end)
+			task.delay(15, function() if prompt and prompt.Parent then prompt:Destroy() end end)
+		end
+	end)
+
+	MainFrame:GetPropertyChangedSignal("Visible"):Connect(function()
+		if MainFrame.Visible then RefreshServerList() end
 	end)
 end
 
