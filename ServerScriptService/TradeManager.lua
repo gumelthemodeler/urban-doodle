@@ -1,9 +1,13 @@
 -- @ScriptType: Script
--- @ScriptType: Script
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
 local RemotesFolder = ReplicatedStorage:WaitForChild("Network")
+
+-- GUARANTEE REMOTES EXIST SO NO INFINITE YIELDS HAPPEN
+local TradeAction = RemotesFolder:FindFirstChild("TradeAction") or Instance.new("RemoteEvent", RemotesFolder); TradeAction.Name = "TradeAction"
+local TradeRequest = RemotesFolder:FindFirstChild("TradeRequest") or Instance.new("RemoteEvent", RemotesFolder); TradeRequest.Name = "TradeRequest"
+local TradeUpdate = RemotesFolder:FindFirstChild("TradeUpdate") or Instance.new("RemoteEvent", RemotesFolder); TradeUpdate.Name = "TradeUpdate"
 
 local ItemData = require(ReplicatedStorage:WaitForChild("ItemData"))
 
@@ -123,14 +127,32 @@ local function ExecuteTrade(tradeId)
 	trade.P1:SetAttribute("InTrade", false)
 	trade.P2:SetAttribute("InTrade", false)
 
-	-- [[ FIX: Anti-Scam Console Logger ]]
+	-- [[ FIX: Format Items for Logging and Notifications ]]
 	local function FormatItems(itemsTable)
 		local str = ""
-		for k,v in pairs(itemsTable) do str = str .. k .. "x" .. v .. ", " end
-		return str ~= "" and str or "None"
+		for k, v in pairs(itemsTable) do str = str .. v .. "x " .. k .. ", " end
+		if str ~= "" then str = str:sub(1, -3) else str = "No items" end
+		return str
 	end
-	print("[TRADE SECURE LOG] " .. trade.P1.Name .. " traded [" .. FormatItems(trade.P1Offer.Items) .. trade.P1Offer.Dews .. " Dews] TO " .. trade.P2.Name .. " FOR [" .. FormatItems(trade.P2Offer.Items) .. trade.P2Offer.Dews .. " Dews]")
 
+	local p1GivesItems = FormatItems(trade.P1Offer.Items)
+	local p2GivesItems = FormatItems(trade.P2Offer.Items)
+
+	-- 1. Anti-Scam Console Logger
+	print("[TRADE SECURE LOG] " .. trade.P1.Name .. " traded [" .. p1GivesItems .. " | " .. trade.P1Offer.Dews .. " Dews] TO " .. trade.P2.Name .. " FOR [" .. p2GivesItems .. " | " .. trade.P2Offer.Dews .. " Dews]")
+
+	-- 2. Build the Notification Strings
+	local p1ReceivedMsg = "Trade Processed! Received: " .. p2GivesItems
+	if trade.P2Offer.Dews > 0 then p1ReceivedMsg = p1ReceivedMsg .. " & " .. trade.P2Offer.Dews .. " Dews" end
+
+	local p2ReceivedMsg = "Trade Processed! Received: " .. p1GivesItems
+	if trade.P1Offer.Dews > 0 then p2ReceivedMsg = p2ReceivedMsg .. " & " .. trade.P1Offer.Dews .. " Dews" end
+
+	-- 3. Fire Client Notifications
+	RemotesFolder.NotificationEvent:FireClient(trade.P1, p1ReceivedMsg, "Success")
+	RemotesFolder.NotificationEvent:FireClient(trade.P2, p2ReceivedMsg, "Success")
+
+	-- 4. Close the Trade UI
 	RemotesFolder.TradeUpdate:FireClient(trade.P1, "TradeComplete")
 	RemotesFolder.TradeUpdate:FireClient(trade.P2, "TradeComplete")
 	ActiveTrades[tradeId] = nil
