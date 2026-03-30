@@ -147,10 +147,15 @@ function TradeMenu.Init(parentFrame, tooltipMgr)
 				ApplyButtonGradient(reqBtn, Color3.fromRGB(20, 25, 35), Color3.fromRGB(10, 15, 25), Color3.fromRGB(80, 140, 220))
 
 				reqBtn.MouseButton1Click:Connect(function()
-					Network.TradeRequest:FireServer(p.Name)
+					-- FIX 1: Send the correct Action ("SendRequest") through the TradeAction remote
+					Network.TradeAction:FireServer("SendRequest", p.Name)
+
 					reqBtn.Text = "SENT"; reqBtn.TextColor3 = Color3.fromRGB(150, 255, 150)
 					ApplyButtonGradient(reqBtn, Color3.fromRGB(25, 35, 25), Color3.fromRGB(15, 20, 15), Color3.fromRGB(80, 180, 80))
-					task.delay(3, function() reqBtn.Text = "REQUEST"; reqBtn.TextColor3 = Color3.fromRGB(150, 200, 255); ApplyButtonGradient(reqBtn, Color3.fromRGB(20, 25, 35), Color3.fromRGB(10, 15, 25), Color3.fromRGB(80, 140, 220)) end)
+					task.delay(3, function() 
+						reqBtn.Text = "REQUEST"; reqBtn.TextColor3 = Color3.fromRGB(150, 200, 255)
+						ApplyButtonGradient(reqBtn, Color3.fromRGB(20, 25, 35), Color3.fromRGB(10, 15, 25), Color3.fromRGB(80, 140, 220)) 
+					end)
 				end)
 			end
 		end
@@ -188,7 +193,7 @@ function TradeMenu.Init(parentFrame, tooltipMgr)
 			myOfferFrame.Size = UDim2.new(0.48, 0, 0.45, 0); myOfferFrame.Position = UDim2.new(0,0,0,0)
 			myOfferFrame.BackgroundColor3 = Color3.fromRGB(15,15,20); myOfferFrame.ScrollBarThickness = 0
 			Instance.new("UICorner", myOfferFrame).CornerRadius = UDim.new(0,6); Instance.new("UIStroke", myOfferFrame).Color = Color3.fromRGB(60,60,70)
-			local mg = Instance.new("UIGridLayout", myOfferFrame); mg.CellSize = UDim2.new(0, 60, 0, 60); mg.Padding = UDim.new(0,5,0,5)
+			local mg = Instance.new("UIGridLayout", myOfferFrame); mg.CellSize = UDim2.new(0, 60, 0, 60); mg.CellPadding = UDim2.new(0,5,0,5)
 			local mPad = Instance.new("UIPadding", myOfferFrame); mPad.PaddingTop = UDim.new(0,5); mPad.PaddingLeft = UDim.new(0,5)
 
 			local theirOfferFrame = Instance.new("ScrollingFrame", tradeContentArea)
@@ -196,7 +201,7 @@ function TradeMenu.Init(parentFrame, tooltipMgr)
 			theirOfferFrame.Size = UDim2.new(0.48, 0, 0.45, 0); theirOfferFrame.Position = UDim2.new(0.52,0,0,0)
 			theirOfferFrame.BackgroundColor3 = Color3.fromRGB(15,15,20); theirOfferFrame.ScrollBarThickness = 0
 			Instance.new("UICorner", theirOfferFrame).CornerRadius = UDim.new(0,6); Instance.new("UIStroke", theirOfferFrame).Color = Color3.fromRGB(60,60,70)
-			local tg = Instance.new("UIGridLayout", theirOfferFrame); tg.CellSize = UDim2.new(0, 60, 0, 60); tg.Padding = UDim.new(0,5,0,5)
+			local tg = Instance.new("UIGridLayout", theirOfferFrame); tg.CellSize = UDim2.new(0, 60, 0, 60); tg.CellPadding = UDim2.new(0,5,0,5)
 			local tPad = Instance.new("UIPadding", theirOfferFrame); tPad.PaddingTop = UDim.new(0,5); tPad.PaddingLeft = UDim.new(0,5)
 
 			-- [[ FIX: Graphic Inventory Selector replaces the text box ]]
@@ -205,7 +210,7 @@ function TradeMenu.Init(parentFrame, tooltipMgr)
 			inventorySelector.Size = UDim2.new(1, 0, 0.45, 0); inventorySelector.Position = UDim2.new(0,0,0.55,0)
 			inventorySelector.BackgroundColor3 = Color3.fromRGB(12,12,15); inventorySelector.ScrollBarThickness = 0
 			Instance.new("UICorner", inventorySelector).CornerRadius = UDim.new(0,6); Instance.new("UIStroke", inventorySelector).Color = Color3.fromRGB(100,100,150)
-			local ig = Instance.new("UIGridLayout", inventorySelector); ig.CellSize = UDim2.new(0, 60, 0, 60); ig.Padding = UDim.new(0,5,0,5)
+			local ig = Instance.new("UIGridLayout", inventorySelector); ig.CellSize = UDim2.new(0, 60, 0, 60); ig.CellPadding = UDim2.new(0,5,0,5)
 			local iPad = Instance.new("UIPadding", inventorySelector); iPad.PaddingTop = UDim.new(0,5); iPad.PaddingLeft = UDim.new(0,5)
 
 			local confirmBtn = Instance.new("TextButton", mainPanel)
@@ -277,6 +282,57 @@ function TradeMenu.Init(parentFrame, tooltipMgr)
 		end
 	end)
 end
+
+-- FIX 2: Listen for Incoming Trade Requests and Spawn a Popup
+Network:WaitForChild("TradeRequest").OnClientEvent:Connect(function(senderName)
+	local AOT_UI = playerGui:WaitForChild("AOT_Interface", 5)
+	if not AOT_UI then return end
+
+	-- Don't spawn multiple prompts for the same person
+	if AOT_UI:FindFirstChild("IncomingTradePrompt_" .. senderName) then return end
+
+	-- Create a sleek notification prompt
+	local prompt = Instance.new("Frame", AOT_UI)
+	prompt.Name = "IncomingTradePrompt_" .. senderName
+	prompt.Size = UDim2.new(0, 300, 0, 120)
+	prompt.Position = UDim2.new(0.5, 0, 0.85, 0)
+	prompt.AnchorPoint = Vector2.new(0.5, 0.5)
+	prompt.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+	Instance.new("UICorner", prompt).CornerRadius = UDim.new(0, 8)
+
+	local stroke = Instance.new("UIStroke", prompt)
+	stroke.Color = Color3.fromRGB(150, 200, 255); stroke.Thickness = 2
+
+	local lbl = Instance.new("TextLabel", prompt)
+	lbl.Size = UDim2.new(1, 0, 0, 50); lbl.BackgroundTransparency = 1
+	lbl.Font = Enum.Font.GothamBlack; lbl.TextColor3 = Color3.fromRGB(255, 255, 255); lbl.TextSize = 14
+	lbl.Text = senderName .. " sent a trade request!"
+
+	local accBtn = Instance.new("TextButton", prompt)
+	accBtn.Size = UDim2.new(0.4, 0, 0, 40); accBtn.Position = UDim2.new(0.05, 0, 1, -50)
+	accBtn.Font = Enum.Font.GothamBlack; accBtn.TextColor3 = Color3.fromRGB(150, 255, 150); accBtn.Text = "ACCEPT"; accBtn.TextSize = 14
+	ApplyButtonGradient(accBtn, Color3.fromRGB(20, 40, 20), Color3.fromRGB(10, 20, 10), Color3.fromRGB(80, 180, 80))
+
+	local decBtn = Instance.new("TextButton", prompt)
+	decBtn.Size = UDim2.new(0.4, 0, 0, 40); decBtn.Position = UDim2.new(0.55, 0, 1, -50)
+	decBtn.Font = Enum.Font.GothamBlack; decBtn.TextColor3 = Color3.fromRGB(255, 150, 150); decBtn.Text = "DECLINE"; decBtn.TextSize = 14
+	ApplyButtonGradient(decBtn, Color3.fromRGB(40, 20, 20), Color3.fromRGB(20, 10, 10), Color3.fromRGB(180, 80, 80))
+
+	accBtn.MouseButton1Click:Connect(function()
+		Network.TradeAction:FireServer("AcceptRequest", senderName)
+		prompt:Destroy()
+	end)
+
+	decBtn.MouseButton1Click:Connect(function()
+		Network.TradeAction:FireServer("DeclineRequest", senderName)
+		prompt:Destroy()
+	end)
+
+	-- Auto-destroy prompt after 15 seconds if ignored
+	task.delay(15, function()
+		if prompt and prompt.Parent then prompt:Destroy() end
+	end)
+end)
 
 function TradeMenu.Show() if MainFrame then MainFrame.Visible = true end end
 
