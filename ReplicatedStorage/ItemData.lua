@@ -3,6 +3,7 @@
 local ItemData = {}
 
 ItemData.Equipment = {
+	-- [[ STANDARD EQUIPMENT ]]
 	["Training Dummy Sword"] = { Type = "Weapon", Style = "None", Rarity = "Common", Cost = 250, Bonus = { Strength = 1 }, Desc = "A blunt wooden sword. Practically useless." },
 	["Cadet Training Blade"] = { Type = "Weapon", Style = "None", Rarity = "Common", Cost = 500, Bonus = { Strength = 2, Speed = 2 }, Desc = "Standard issue cadet blade." },
 	["Garrison Standard Blades"] = { Type = "Weapon", Style = "Ultrahard Steel Blades", Rarity = "Uncommon", Cost = 1200, Bonus = { Strength = 6, Speed = 4 }, Desc = "Standard blades used by the Garrison Regiment." },
@@ -28,7 +29,12 @@ ItemData.Equipment = {
 	["Hange's Goggles"] = { Type = "Accessory", Rarity = "Epic", Cost = 15000, Bonus = { Speed = 25, Gas = 20 }, Desc = "Protects the eyes during high-speed maneuvers." },
 	["Mikasa's Scarf"] = { Type = "Accessory", Rarity = "Legendary", Cost = 40000, Bonus = { Strength = 30, Speed = 30, Resolve = 25 }, Desc = "A warm, red scarf. Fills you with a burning resolve." },
 	["Erwin's Pendant"] = { Type = "Accessory", Rarity = "Legendary", Cost = 45000, Bonus = { Resolve = 60, Defense = 30, Health = 30 }, Desc = "A symbol of absolute, unwavering leadership." },
-	["Coordinate's Sand"] = { Type = "Accessory", Rarity = "Mythical", Cost = 250000, Bonus = { Strength = 50, Defense = 50, Speed = 50, Resolve = 50, Gas = 50, Health = 50 }, Desc = "A handful of sand from the Paths. Godlike power." }
+	["Coordinate's Sand"] = { Type = "Accessory", Rarity = "Mythical", Cost = 250000, Bonus = { Strength = 50, Defense = 50, Speed = 50, Resolve = 50, Gas = 50, Health = 50 }, Desc = "A handful of sand from the Paths. Godlike power." },
+
+	-- [[ NEW: CURSED NIGHTMARE EQUIPMENT ]]
+	["Blade of the Frenzied"] = { Type = "Weapon", Style = "Ultrahard Steel Blades", Rarity = "Transcendent", Cost = 1000000, Bonus = { Strength = 150, Speed = 50, Defense = -50 }, Cursed = true, SelfDamage = 0.05, Desc = "<font color='#FF3333'>[CURSED]</font> Insane damage, but you take 5% Max HP damage every time you attack. Halves your Defense." },
+	["Abyssal Thunder Spear"] = { Type = "Weapon", Style = "Thunder Spears", Rarity = "Transcendent", Cost = 1000000, Bonus = { Strength = 250, Speed = -20 }, Cursed = true, SelfDamage = 0.10, Desc = "<font color='#FF3333'>[CURSED]</font> A nuclear payload. You take 10% Max HP damage on launch. Sluggish speed." },
+	["Shroud of the Doomed"] = { Type = "Accessory", Rarity = "Transcendent", Cost = 1000000, Bonus = { Resolve = 200, Health = 100 }, Cursed = true, NoDodge = true, Desc = "<font color='#FF3333'>[CURSED]</font> Makes you incredibly tanky and immune to stun, but permanently drops your Dodge chance to 0%." }
 }
 
 ItemData.Consumables = {
@@ -38,8 +44,13 @@ ItemData.Consumables = {
 
 	["Ancestral Awakening Serum"] = { Rarity = "Mythical", Cost = 150000, Action = "AwakenClan", Desc = "Awakens the true power of your current lineage. Only works on major clans." },
 	["Ymir's Clay Fragment"] = { Rarity = "Mythical", Cost = 150000, Action = "AwakenTitan", Desc = "Allows the Attack Titan to reach the Coordinate." },
-
 	["Titan Hardening Extract"] = { Rarity = "Legendary", Cost = 75000, Desc = "Used in the Forge to Awaken max-tier weapons with random Substats." },
+
+	-- [[ NEW: CRAFTING MATERIALS ]]
+	["Iron Bamboo Heart"] = { Rarity = "Epic", Cost = 3000, IsMaterial = true, Desc = "A rare material extracted from the Titan Forest via Expeditions. Used for complex forging." },
+	["Glowing Titan Crystal"] = { Rarity = "Legendary", Cost = 10000, IsMaterial = true, Desc = "A dense energy crystal found deep in Expeditions. Highly sought after by Hange." },
+	["Abyssal Blood"] = { Rarity = "Mythical", Cost = 50000, IsMaterial = true, Desc = "A terrifying black liquid dropped only by Nightmare Bosses. Used to forge Cursed gear." },
+	["Coordinate Shard"] = { Rarity = "Transcendent", Cost = 250000, IsMaterial = true, Desc = "A literal fragment of the Paths. The rarest material in existence." },
 
 	["Iron Bamboo Extract"] = { Rarity = "Epic", Cost = 8000, Action = "Consume", Buff = "Damage", Duration = 900, Desc = "Increases all damage dealt by 50% for 15 minutes." },
 	["Titan Research Notes"] = { Rarity = "Rare", Cost = 5000, Action = "Consume", Buff = "XP", Duration = 900, Desc = "Doubles all XP gained from combat and training for 15 minutes." },
@@ -56,39 +67,34 @@ ItemData.Consumables = {
 	["Backpack Expansion (Gift)"] = { Rarity = "Transcendent", Cost = 0, IsGift = true, Action = "Consume", Buff = "Gamepass", Unlock = "BackpackExpansion", Desc = "Permanently adds +50 slots to your Max Inventory capacity. Cannot be sold." }
 }
 
--- [[ THE FIX: Dynamically injects an Itemized Consumable for every Titan ]]
+-- Inject Itemized Titans
 local TitanData = require(script.Parent:WaitForChild("TitanData"))
 for tName, tData in pairs(TitanData.Titans) do
-	ItemData.Consumables["Itemized " .. tName] = { 
-		Rarity = tData.Rarity, 
-		Cost = 25000, 
-		Action = "EquipTitan", 
-		TitanName = tName, 
-		Desc = "An extracted spine of the " .. tName .. ". Consume to equip it (WARNING: Overwrites your currently equipped Titan)." 
-	}
+	ItemData.Consumables["Itemized " .. tName] = { Rarity = tData.Rarity, Cost = 25000, Action = "EquipTitan", TitanName = tName, Desc = "An extracted spine of the " .. tName .. ". Consume to equip it." }
 end
 
+-- [[ THE FIX: COMPLEX FORGE TREES ]]
 ItemData.ForgeRecipes = {
-	["Cadet Training Blade"] = { Result = "Garrison Standard Blades", ReqAmt = 3, DewCost = 1500 },
-	["Garrison Standard Blades"] = { Result = "Ultrahard Steel Blades", ReqAmt = 3, DewCost = 4500 },
-	["Ultrahard Steel Blades"] = { Result = "Advanced ODM Gear", ReqAmt = 2, DewCost = 6000 },
-	["Advanced ODM Gear"] = { Result = "Veteran Scout Blades", ReqAmt = 3, DewCost = 15000 },
-	["Veteran Scout Blades"] = { Result = "Iceburst Steel Blades", ReqAmt = 5, DewCost = 45000 },
-	["Marleyan Rifle"] = { Result = "Anti-Personnel Pistols", ReqAmt = 3, DewCost = 5000 },
-	["Anti-Personnel Pistols"] = { Result = "Titan-Killer Artillery", ReqAmt = 4, DewCost = 25000 },
-	["Titan-Killer Artillery"] = { Result = "Kenny's Custom Pistols", ReqAmt = 2, DewCost = 55000 },
-	["Worn Trainee Badge"] = { Result = "Scout Training Manual", ReqAmt = 2, DewCost = 500 },
-	["Scout Training Manual"] = { Result = "Scout Regiment Cloak", ReqAmt = 3, DewCost = 3500 },
-	["Scout Regiment Cloak"] = { Result = "Commander's Bolo Tie", ReqAmt = 3, DewCost = 10000 },
-	["Commander's Bolo Tie"] = { Result = "Erwin's Pendant", ReqAmt = 3, DewCost = 50000 },
+	["Garrison Standard Blades"] = { Result = "Garrison Standard Blades", ReqItems = {["Cadet Training Blade"] = 3}, DewCost = 1500 },
+	["Ultrahard Steel Blades"] = { Result = "Ultrahard Steel Blades", ReqItems = {["Garrison Standard Blades"] = 3, ["Iron Bamboo Heart"] = 1}, DewCost = 4500 },
+	["Advanced ODM Gear"] = { Result = "Advanced ODM Gear", ReqItems = {["Ultrahard Steel Blades"] = 2, ["Iron Bamboo Heart"] = 3}, DewCost = 10000 },
+	["Veteran Scout Blades"] = { Result = "Veteran Scout Blades", ReqItems = {["Advanced ODM Gear"] = 2, ["Glowing Titan Crystal"] = 1}, DewCost = 25000 },
+	["Iceburst Steel Blades"] = { Result = "Iceburst Steel Blades", ReqItems = {["Veteran Scout Blades"] = 3, ["Glowing Titan Crystal"] = 5}, DewCost = 100000 },
 
-	["Standard Titan Serum"] = { Result = "Spinal Fluid Syringe", ReqAmt = 10, DewCost = 50000 },
-	["Spinal Fluid Syringe"] = { Result = "Ymir's Clay Fragment", ReqAmt = 10, DewCost = 1000000 },
+	["Anti-Personnel Pistols"] = { Result = "Anti-Personnel Pistols", ReqItems = {["Marleyan Rifle"] = 3}, DewCost = 5000 },
+	["Titan-Killer Artillery"] = { Result = "Titan-Killer Artillery", ReqItems = {["Anti-Personnel Pistols"] = 4, ["Glowing Titan Crystal"] = 2}, DewCost = 35000 },
+	["Kenny's Custom Pistols"] = { Result = "Kenny's Custom Pistols", ReqItems = {["Titan-Killer Artillery"] = 2, ["Coordinate Shard"] = 1}, DewCost = 150000 },
 
-	["Clan Blood Vial"] = { Result = "Titan Hardening Extract", ReqAmt = 5, DewCost = 100000 },
-	["Titan Hardening Extract"] = { Result = "Ancestral Awakening Serum", ReqAmt = 5, DewCost = 1000000 }
+	["Spinal Fluid Syringe"] = { Result = "Spinal Fluid Syringe", ReqItems = {["Standard Titan Serum"] = 10, ["Glowing Titan Crystal"] = 3}, DewCost = 500000 },
+	["Ymir's Clay Fragment"] = { Result = "Ymir's Clay Fragment", ReqItems = {["Spinal Fluid Syringe"] = 10, ["Coordinate Shard"] = 3}, DewCost = 2500000 },
+	["Ancestral Awakening Serum"] = { Result = "Ancestral Awakening Serum", ReqItems = {["Titan Hardening Extract"] = 5, ["Coordinate Shard"] = 1}, DewCost = 1000000 },
+
+	["Blade of the Frenzied"] = { Result = "Blade of the Frenzied", ReqItems = {["Iceburst Steel Blades"] = 1, ["Abyssal Blood"] = 3}, DewCost = 5000000 },
+	["Abyssal Thunder Spear"] = { Result = "Abyssal Thunder Spear", ReqItems = {["Thunder Spear"] = 5, ["Abyssal Blood"] = 3}, DewCost = 5000000 },
+	["Shroud of the Doomed"] = { Result = "Shroud of the Doomed", ReqItems = {["Commander's Bolo Tie"] = 5, ["Abyssal Blood"] = 3}, DewCost = 5000000 }
 }
 
+-- [[ RESTORED: GAMEPASSES ]]
 ItemData.Gamepasses = {
 	{ ID = 1749846514, GiftID = 3562817556, Name = "Auto Train", Desc = "Passively generates Training XP in the background.", Key = "AutoTrain" },
 	{ ID = 1748534838, GiftID = 3562817710, Name = "2x XP & Funds", Desc = "Doubles all XP and Dews gained from combat and training.", Key = "DoubleXP" },
@@ -100,6 +106,7 @@ ItemData.Gamepasses = {
 	{ ID = 1772982444, GiftID = 3564166063, Name = "Backpack Expansion", Desc = "Permanently adds +50 slots to your Max Inventory capacity.", Key = "BackpackExpansion" }
 }
 
+-- [[ RESTORED: PRODUCTS ]]
 ItemData.Products = {
 	{ ID = 3557925572, Name = "Shop Reroll", Desc = "Instantly restocks the Military Supply with new items.", IsReroll = true },
 	{ ID = 3557909080, Name = "5,000 Dews", Desc = "A small injection of military funds.", Reward = "Dews", Amount = 5000 },
