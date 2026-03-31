@@ -21,18 +21,13 @@ local SubBtns = {}
 local selectedCraftingRecipe = nil
 local selectedWeapon = nil
 
--- [[ THE FIX: Separated Fusion Logic State ]]
 local fusionState = "Base"
 local selectedFusionBase = nil
 local selectedFusionSacrifice = nil
 
-local ingBoxName, ingBoxCount, ingStroke, ingTagBox, ingTagTxt
-local dewsBoxCount, dewsStroke, dewsTagBox
-local resBoxName, resStroke, resTagBox, resTagTxt
-local craftBtn
+local craftBtn, FormulaArea
 local rightPanelName, rightPanelStats, awakenBtn, extractCountLbl
 
--- [[ THE FIX: Updated Fusion UI References ]]
 local fusBaseBox, fusSacBox, fusResBox
 local fuseBtn
 local RecipeList, CraftInvGrid
@@ -83,17 +78,38 @@ end
 local function TweenGradient(grad, targetTop, targetBot, duration)
 	local startTop = grad.Color.Keypoints[1].Value
 	local startBot = grad.Color.Keypoints[#grad.Color.Keypoints].Value
-	local val = Instance.new("NumberValue")
-	val.Value = 0
+	local val = Instance.new("NumberValue"); val.Value = 0
 	local tween = TweenService:Create(val, TweenInfo.new(duration), {Value = 1})
 	val.Changed:Connect(function(v)
-		grad.Color = ColorSequence.new{
-			ColorSequenceKeypoint.new(0, startTop:Lerp(targetTop, v)),
-			ColorSequenceKeypoint.new(1, startBot:Lerp(targetBot, v))
-		}
+		grad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, startTop:Lerp(targetTop, v)), ColorSequenceKeypoint.new(1, startBot:Lerp(targetBot, v))}
 	end)
-	tween:Play()
-	tween.Completed:Connect(function() val:Destroy() end)
+	tween:Play(); tween.Completed:Connect(function() val:Destroy() end)
+end
+
+local function CreateStationSquare(parent, rarityColor, isDews, lOrder)
+	local sq = Instance.new("TextButton", parent)
+	sq.Size = UDim2.new(0, 70, 0, 70); sq.BackgroundColor3 = Color3.fromRGB(22, 22, 28); sq.Text = ""; sq.LayoutOrder = lOrder
+	local stroke = Instance.new("UIStroke", sq); stroke.Color = Color3.fromHex(rarityColor:gsub("#","")); stroke.Thickness = 2; stroke.LineJoinMode = Enum.LineJoinMode.Miter; stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+	local tBox, tTxt
+	if not isDews then
+		tBox = Instance.new("Frame", sq); tBox.Size = UDim2.new(0, 14, 0, 14); tBox.Position = UDim2.new(0, 4, 0, 4); tBox.BackgroundColor3 = stroke.Color
+		Instance.new("UICorner", tBox).CornerRadius = UDim.new(0, 4)
+		tTxt = Instance.new("TextLabel", tBox); tTxt.Size = UDim2.new(1, 0, 1, 0); tTxt.BackgroundTransparency = 1; tTxt.Font = Enum.Font.GothamBlack; tTxt.TextColor3 = Color3.new(0,0,0); tTxt.TextSize = 9; tTxt.Text = "?"
+	end
+
+	local nameLbl = Instance.new("TextLabel", sq); nameLbl.Size = UDim2.new(0.9, 0, 0.45, 0); nameLbl.Position = UDim2.new(0.5, 0, 0.5, 0); nameLbl.AnchorPoint = Vector2.new(0.5, 0.5); nameLbl.BackgroundTransparency = 1; nameLbl.Font = Enum.Font.GothamBold; nameLbl.TextColor3 = Color3.fromRGB(230, 230, 230); nameLbl.TextScaled = true; nameLbl.TextWrapped = true; nameLbl.Text = isDews and "DEWS" or "???"
+	if isDews then nameLbl.TextColor3 = Color3.fromRGB(255, 215, 100); nameLbl.Font = Enum.Font.GothamBlack end
+	local tCon = Instance.new("UITextSizeConstraint", nameLbl); tCon.MaxTextSize = isDews and 16 or 10; tCon.MinTextSize = 6
+
+	local cntLbl = Instance.new("TextLabel", sq); cntLbl.Size = UDim2.new(1, -4, 0, 15); cntLbl.Position = UDim2.new(0, 2, 1, -15); cntLbl.BackgroundTransparency = 1; cntLbl.Font = Enum.Font.GothamBold; cntLbl.TextColor3 = Color3.fromRGB(150, 150, 150); cntLbl.TextSize = 8; cntLbl.TextXAlignment = Enum.TextXAlignment.Center; cntLbl.Text = isDews and "Cost: 0" or "Req: 0"; cntLbl.RichText = true
+
+	return sq, nameLbl, cntLbl, stroke, tBox, tTxt
+end
+
+local function CreateMathSym(parent, sym, lOrder)
+	local lbl = Instance.new("TextLabel", parent); lbl.Size = UDim2.new(0, 15, 0, 70); lbl.BackgroundTransparency = 1; lbl.Font = Enum.Font.GothamBlack; lbl.TextColor3 = Color3.fromRGB(150, 150, 150); lbl.TextSize = 20; lbl.Text = sym; lbl.LayoutOrder = lOrder
+	return lbl
 end
 
 function ForgeTab.Init(parentFrame, tooltipMgr)
@@ -152,43 +168,17 @@ function ForgeTab.Init(parentFrame, tooltipMgr)
 	local wbTitle = Instance.new("TextLabel", WorkbenchPanel)
 	wbTitle.Size = UDim2.new(1, 0, 0, 25); wbTitle.Position = UDim2.new(0, 0, 0, 5); wbTitle.BackgroundTransparency = 1; wbTitle.Font = Enum.Font.GothamBlack; wbTitle.TextColor3 = Color3.fromRGB(150, 200, 255); wbTitle.TextSize = 14; wbTitle.Text = "WORKBENCH"
 
-	local FormulaArea = Instance.new("Frame", WorkbenchPanel)
-	FormulaArea.Size = UDim2.new(1, 0, 0, 75); FormulaArea.Position = UDim2.new(0, 0, 0, 30); FormulaArea.BackgroundTransparency = 1
-	local fLayout = Instance.new("UIListLayout", FormulaArea); fLayout.FillDirection = Enum.FillDirection.Horizontal; fLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; fLayout.VerticalAlignment = Enum.VerticalAlignment.Center; fLayout.Padding = UDim.new(0, 5)
-	fLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	FormulaArea = Instance.new("ScrollingFrame", WorkbenchPanel)
+	FormulaArea.Size = UDim2.new(1, -10, 0, 85); FormulaArea.Position = UDim2.new(0, 5, 0, 30); FormulaArea.BackgroundTransparency = 1
+	FormulaArea.ScrollBarThickness = 4; FormulaArea.ScrollingDirection = Enum.ScrollingDirection.X; FormulaArea.BorderSizePixel = 0
+	local fLayout = Instance.new("UIListLayout", FormulaArea); fLayout.FillDirection = Enum.FillDirection.Horizontal; fLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; fLayout.VerticalAlignment = Enum.VerticalAlignment.Center; fLayout.Padding = UDim.new(0, 5); fLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-	local function CreateStationSquare(parent, rarityColor, isDews, lOrder)
-		local sq = Instance.new("TextButton", parent)
-		sq.Size = UDim2.new(0, 70, 0, 70); sq.BackgroundColor3 = Color3.fromRGB(22, 22, 28); sq.Text = ""; sq.LayoutOrder = lOrder
-		local stroke = Instance.new("UIStroke", sq); stroke.Color = Color3.fromHex(rarityColor:gsub("#","")); stroke.Thickness = 2; stroke.LineJoinMode = Enum.LineJoinMode.Miter; stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	fLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() 
+		FormulaArea.CanvasSize = UDim2.new(0, fLayout.AbsoluteContentSize.X, 0, 0) 
+	end)
 
-		local tBox, tTxt
-		if not isDews then
-			tBox = Instance.new("Frame", sq); tBox.Size = UDim2.new(0, 14, 0, 14); tBox.Position = UDim2.new(0, 4, 0, 4); tBox.BackgroundColor3 = stroke.Color
-			Instance.new("UICorner", tBox).CornerRadius = UDim.new(0, 4)
-			tTxt = Instance.new("TextLabel", tBox); tTxt.Size = UDim2.new(1, 0, 1, 0); tTxt.BackgroundTransparency = 1; tTxt.Font = Enum.Font.GothamBlack; tTxt.TextColor3 = Color3.new(0,0,0); tTxt.TextSize = 9; tTxt.Text = "?"
-		end
-
-		local nameLbl = Instance.new("TextLabel", sq); nameLbl.Size = UDim2.new(0.9, 0, 0.45, 0); nameLbl.Position = UDim2.new(0.5, 0, 0.5, 0); nameLbl.AnchorPoint = Vector2.new(0.5, 0.5); nameLbl.BackgroundTransparency = 1; nameLbl.Font = Enum.Font.GothamBold; nameLbl.TextColor3 = Color3.fromRGB(230, 230, 230); nameLbl.TextScaled = true; nameLbl.TextWrapped = true; nameLbl.Text = isDews and "DEWS" or "???"
-		if isDews then nameLbl.TextColor3 = Color3.fromRGB(255, 215, 100); nameLbl.Font = Enum.Font.GothamBlack end
-		local tCon = Instance.new("UITextSizeConstraint", nameLbl); tCon.MaxTextSize = isDews and 16 or 10; tCon.MinTextSize = 6
-
-		local cntLbl = Instance.new("TextLabel", sq); cntLbl.Size = UDim2.new(1, -4, 0, 15); cntLbl.Position = UDim2.new(0, 2, 1, -15); cntLbl.BackgroundTransparency = 1; cntLbl.Font = Enum.Font.GothamBold; cntLbl.TextColor3 = Color3.fromRGB(150, 150, 150); cntLbl.TextSize = 8; cntLbl.TextXAlignment = Enum.TextXAlignment.Center; cntLbl.Text = isDews and "Cost: 0" or "Req: 0"; cntLbl.RichText = true
-
-		return sq, nameLbl, cntLbl, stroke, tBox, tTxt
-	end
-
-	local function CreateMathSym(parent, sym, lOrder)
-		local lbl = Instance.new("TextLabel", parent); lbl.Size = UDim2.new(0, 15, 0, 70); lbl.BackgroundTransparency = 1; lbl.Font = Enum.Font.GothamBlack; lbl.TextColor3 = Color3.fromRGB(150, 150, 150); lbl.TextSize = 20; lbl.Text = sym; lbl.LayoutOrder = lOrder
-		return lbl
-	end
-
-	local IngBox; IngBox, ingBoxName, ingBoxCount, ingStroke, ingTagBox, ingTagTxt = CreateStationSquare(FormulaArea, "#FFFFFF", false, 1)
-	CreateMathSym(FormulaArea, "+", 2)
-	local DewsBox; DewsBox, _, dewsBoxCount, dewsStroke = CreateStationSquare(FormulaArea, "#FFD700", true, 3)
-	CreateMathSym(FormulaArea, "=", 4)
-	local ResBox; ResBox, resBoxName, _, resStroke, resTagBox, resTagTxt = CreateStationSquare(FormulaArea, "#FFFFFF", false, 5)
-	ResBox.BackgroundColor3 = Color3.fromRGB(35, 30, 30)
+	local fPlaceholder = Instance.new("TextLabel", FormulaArea)
+	fPlaceholder.Size = UDim2.new(1, 0, 1, 0); fPlaceholder.BackgroundTransparency = 1; fPlaceholder.Font = Enum.Font.GothamMedium; fPlaceholder.TextColor3 = Color3.fromRGB(150, 150, 150); fPlaceholder.TextSize = 12; fPlaceholder.Text = "Select a Blueprint below to view its formula."
 
 	craftBtn = Instance.new("TextButton", WorkbenchPanel)
 	craftBtn.Size = UDim2.new(0.8, 0, 0, 35); craftBtn.Position = UDim2.new(0.1, 0, 1, -45); craftBtn.Font = Enum.Font.GothamBlack; craftBtn.TextColor3 = Color3.fromRGB(255, 255, 255); craftBtn.TextSize = 14; craftBtn.Text = "SELECT BLUEPRINT"
@@ -218,15 +208,77 @@ function ForgeTab.Init(parentFrame, tooltipMgr)
 
 	cigLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() CraftInvGrid.Size = UDim2.new(0.95, 0, 0, cigLayout.AbsoluteContentSize.Y + 30) end)
 
+	local function UpdateFormulaArea()
+		if not selectedCraftingRecipe then return end
+		local recipe = ItemData.ForgeRecipes[selectedCraftingRecipe]
+		if not recipe then return end
+
+		for _, child in ipairs(FormulaArea:GetChildren()) do
+			if child:IsA("GuiObject") and not child:IsA("UIListLayout") then child:Destroy() end
+		end
+
+		local canCraft = true
+		local pDews = player.leaderstats and player.leaderstats:FindFirstChild("Dews") and player.leaderstats.Dews.Value or 0
+		local i = 1
+
+		for reqName, reqAmt in pairs(recipe.ReqItems) do
+			if i > 1 then CreateMathSym(FormulaArea, "+", i * 10) end
+
+			local reqData = ItemData.Equipment[reqName] or ItemData.Consumables[reqName]
+			local reqColor = RarityColors[reqData and reqData.Rarity or "Common"] or "#FFFFFF"
+			local safeReq = reqName:gsub("[^%w]", "") .. "Count"
+			local pHas = player:GetAttribute(safeReq) or 0
+
+			local sq, nameLbl, cntLbl, stroke, tBox, tTxt = CreateStationSquare(FormulaArea, reqColor, false, i * 10 + 1)
+			nameLbl.Text = reqName
+			if tTxt then tTxt.Text = string.sub(reqData and reqData.Rarity or "C", 1, 1) end
+
+			local hasReqColor = (pHas >= reqAmt) and "#55FF55" or "#FF5555"
+			cntLbl.Text = "Req: <font color='"..hasReqColor.."'>" .. pHas .. "/" .. reqAmt .. "</font>"
+
+			if pHas < reqAmt then canCraft = false end
+			i = i + 1
+		end
+
+		CreateMathSym(FormulaArea, "+", 100)
+		local DewsBox, _, dewsBoxCount, _ = CreateStationSquare(FormulaArea, "#FFD700", true, 101)
+		local hasDewColor = (pDews >= recipe.DewCost) and "#55FF55" or "#FF5555"
+		dewsBoxCount.Text = "Cost:<br/><font color='"..hasDewColor.."'>" .. recipe.DewCost .. "</font>"
+		if pDews < recipe.DewCost then canCraft = false end
+
+		CreateMathSym(FormulaArea, "=", 102)
+		local resData = ItemData.Equipment[recipe.Result] or ItemData.Consumables[recipe.Result]
+		local rColor = RarityColors[resData and resData.Rarity or "Common"] or "#FFFFFF"
+		local ResBox, resBoxName, _, _, _, resTagTxt = CreateStationSquare(FormulaArea, rColor, false, 103)
+		ResBox.BackgroundColor3 = Color3.fromRGB(35, 30, 30)
+		resBoxName.Text = recipe.Result
+		if resTagTxt then resTagTxt.Text = string.sub(resData and resData.Rarity or "C", 1, 1) end
+
+		if canCraft then
+			ApplyButtonGradient(craftBtn, Color3.fromRGB(80, 180, 80), Color3.fromRGB(40, 100, 40), Color3.fromRGB(20, 80, 20)); craftBtn.Text = "CRAFT ITEM"
+		else
+			ApplyButtonGradient(craftBtn, Color3.fromRGB(180, 60, 60), Color3.fromRGB(100, 30, 30), Color3.fromRGB(60, 20, 20)); craftBtn.Text = "MISSING MATERIALS"
+		end
+	end
+
 	local function RenderCrafting()
 		for _, child in ipairs(RecipeList:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end
-		for reqItem, recipe in pairs(ItemData.ForgeRecipes) do
+		for recipeName, recipe in pairs(ItemData.ForgeRecipes) do
 			local resData = ItemData.Equipment[recipe.Result] or ItemData.Consumables[recipe.Result]
 			if not resData then continue end
 
+			local canCraft = true
+			for reqName, reqAmt in pairs(recipe.ReqItems) do
+				local safeReq = reqName:gsub("[^%w]", "") .. "Count"
+				if (player:GetAttribute(safeReq) or 0) < reqAmt then
+					canCraft = false
+					break
+				end
+			end
+			local pDews = player.leaderstats and player.leaderstats:FindFirstChild("Dews") and player.leaderstats.Dews.Value or 0
+			if pDews < recipe.DewCost then canCraft = false end
+
 			local rColor = RarityColors[resData.Rarity or "Common"] or "#FFFFFF"
-			local safeReq = reqItem:gsub("[^%w]", "") .. "Count"
-			local pHas = player:GetAttribute(safeReq) or 0
 
 			local btn = Instance.new("TextButton", RecipeList)
 			btn.Size = UDim2.new(1, 0, 0, 45); btn.Text = ""
@@ -238,52 +290,15 @@ function ForgeTab.Init(parentFrame, tooltipMgr)
 			local lbl = Instance.new("TextLabel", btn); lbl.Size = UDim2.new(0.6, 0, 1, 0); lbl.Position = UDim2.new(0, 26, 0, 0); lbl.BackgroundTransparency = 1; lbl.Font = Enum.Font.GothamBold; lbl.TextColor3 = Color3.fromRGB(230,230,230); lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.TextSize = 11
 			lbl.Text = recipe.Result
 
-			local statusLbl = Instance.new("TextLabel", btn); statusLbl.Size = UDim2.new(0, 50, 1, 0); statusLbl.Position = UDim2.new(1, -60, 0, 0); statusLbl.BackgroundTransparency = 1; statusLbl.Font = Enum.Font.GothamMedium; statusLbl.TextColor3 = (pHas >= recipe.ReqAmt) and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100); statusLbl.TextXAlignment = Enum.TextXAlignment.Right; statusLbl.TextSize = 11; statusLbl.Text = pHas .. "/" .. recipe.ReqAmt
+			local statusLbl = Instance.new("TextLabel", btn); statusLbl.Size = UDim2.new(0, 80, 1, 0); statusLbl.Position = UDim2.new(1, -90, 0, 0); statusLbl.BackgroundTransparency = 1; statusLbl.Font = Enum.Font.GothamBlack; statusLbl.TextColor3 = canCraft and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100); statusLbl.TextXAlignment = Enum.TextXAlignment.Right; statusLbl.TextSize = 11; statusLbl.Text = canCraft and "AVAILABLE" or "MISSING"
 
 			btn.MouseButton1Click:Connect(function()
-				selectedCraftingRecipe = reqItem
-
-				local reqData = ItemData.Equipment[reqItem] or ItemData.Consumables[reqItem]
-				local reqColor = RarityColors[reqData and reqData.Rarity or "Common"] or "#FFFFFF"
-
-				ingStroke.Color = Color3.fromHex(reqColor:gsub("#","")); ingTagBox.BackgroundColor3 = ingStroke.Color; ingTagTxt.Text = string.sub(reqData and reqData.Rarity or "C", 1, 1)
-				ingBoxName.Text = reqItem
-
-				local pDews = player.leaderstats and player.leaderstats:FindFirstChild("Dews") and player.leaderstats.Dews.Value or 0
-				local hasReqColor = (pHas >= recipe.ReqAmt) and "#55FF55" or "#FF5555"
-				local hasDewColor = (pDews >= recipe.DewCost) and "#55FF55" or "#FF5555"
-
-				ingBoxCount.Text = "Req: <font color='"..hasReqColor.."'>" .. pHas .. "/" .. recipe.ReqAmt .. "</font>"
-				dewsBoxCount.Text = "Cost:<br/><font color='"..hasDewColor.."'>" .. recipe.DewCost .. "</font>"
-
-				resStroke.Color = Color3.fromHex(rColor:gsub("#","")); resTagBox.BackgroundColor3 = resStroke.Color; resTagTxt.Text = string.sub(resData.Rarity or "C", 1, 1)
-				resBoxName.Text = recipe.Result
-
-				if pHas >= recipe.ReqAmt and pDews >= recipe.DewCost then
-					ApplyButtonGradient(craftBtn, Color3.fromRGB(80, 180, 80), Color3.fromRGB(40, 100, 40), Color3.fromRGB(20, 80, 20)); craftBtn.Text = "CRAFT ITEM"
-				else
-					ApplyButtonGradient(craftBtn, Color3.fromRGB(180, 60, 60), Color3.fromRGB(100, 30, 30), Color3.fromRGB(60, 20, 20)); craftBtn.Text = "MISSING MATERIALS"
-				end
+				selectedCraftingRecipe = recipeName
+				UpdateFormulaArea()
 			end)
 		end
 
-		if selectedCraftingRecipe then
-			local recipe = ItemData.ForgeRecipes[selectedCraftingRecipe]
-			local safeReq = selectedCraftingRecipe:gsub("[^%w]", "") .. "Count"
-			local pHas = player:GetAttribute(safeReq) or 0
-			local pDews = player.leaderstats and player.leaderstats:FindFirstChild("Dews") and player.leaderstats.Dews.Value or 0
-			local hasReqColor = (pHas >= recipe.ReqAmt) and "#55FF55" or "#FF5555"
-			local hasDewColor = (pDews >= recipe.DewCost) and "#55FF55" or "#FF5555"
-
-			ingBoxCount.Text = "Req: <font color='"..hasReqColor.."'>" .. pHas .. "/" .. recipe.ReqAmt .. "</font>"
-			dewsBoxCount.Text = "Cost:<br/><font color='"..hasDewColor.."'>" .. recipe.DewCost .. "</font>"
-
-			if pHas >= recipe.ReqAmt and pDews >= recipe.DewCost then
-				ApplyButtonGradient(craftBtn, Color3.fromRGB(80, 180, 80), Color3.fromRGB(40, 100, 40), Color3.fromRGB(20, 80, 20)); craftBtn.Text = "CRAFT ITEM"
-			else
-				ApplyButtonGradient(craftBtn, Color3.fromRGB(180, 60, 60), Color3.fromRGB(100, 30, 30), Color3.fromRGB(60, 20, 20)); craftBtn.Text = "MISSING MATERIALS"
-			end
-		end
+		if selectedCraftingRecipe then UpdateFormulaArea() end
 
 		for _, child in ipairs(CraftInvGrid:GetChildren()) do if child:IsA("Frame") then child:Destroy() end end
 		local invItems = {}
@@ -413,7 +428,7 @@ function ForgeTab.Init(parentFrame, tooltipMgr)
 
 
 	-- ==========================================
-	-- [[ 3. FUSION TAB (OVERHAULED) ]]
+	-- [[ 3. FUSION TAB ]]
 	-- ==========================================
 	SubTabs["Fusion"] = Instance.new("ScrollingFrame", ContentArea)
 	SubTabs["Fusion"].Size = UDim2.new(1, 0, 1, 0); SubTabs["Fusion"].BackgroundTransparency = 1; SubTabs["Fusion"].Visible = false; SubTabs["Fusion"].ScrollBarThickness = 0
@@ -599,7 +614,6 @@ function ForgeTab.Init(parentFrame, tooltipMgr)
 			ApplyButtonGradient(fuseBtn, Color3.fromRGB(120, 40, 40), Color3.fromRGB(60, 20, 20), Color3.fromRGB(40, 10, 10))
 		end
 	end
-
 
 	-- ==========================================
 	-- [[ GLOBAL REFRESH LOGIC ]]
