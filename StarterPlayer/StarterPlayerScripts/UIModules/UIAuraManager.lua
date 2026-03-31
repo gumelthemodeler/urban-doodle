@@ -8,43 +8,12 @@ local activeConnection = nil
 local activeParticles = {}
 local ambientGlow = nil
 
--- [[ ADD YOUR MULTIPLE IDS HERE ]]
--- The script will randomly pick one of these for every particle spawned.
-local PARTICLE_IDS = {
-	"rbxassetid://14428245156", -- Your flame particle
-	"rbxassetid://91391658964497",
-	"rbxassetid://17735353017",
-	"rbxassetid://101919176010049",
-}
-
 function UIAuraManager.ApplyAura(container, auraData)
 	UIAuraManager.ClearAura()
-
-	-- Function to find and color the gray UIStroke ring around the Avatar
-	local function setAvatarRingColor(color)
-		if container.Parent then
-			for _, child in ipairs(container.Parent:GetChildren()) do
-				if child:IsA("ImageLabel") then -- Finds the AvatarBox
-					local stroke = child:FindFirstChildOfClass("UIStroke")
-					if stroke then
-						stroke.Color = color
-					end
-				end
-			end
-		end
-	end
-
-	-- If no aura, revert the ring to the default gray color and stop
-	if not auraData or auraData.Name == "None" then 
-		setAvatarRingColor(Color3.fromRGB(100, 100, 110)) 
-		return 
-	end
+	if not auraData or auraData.Name == "None" then return end
 
 	local c1 = Color3.fromHex((auraData.Color1 or "#FFFFFF"):gsub("#", ""))
 	local c2 = Color3.fromHex((auraData.Color2 or "#FFFFFF"):gsub("#", ""))
-
-	-- Color the Avatar's ring to match the primary Aura color!
-	setAvatarRingColor(c1)
 
 	-- 1. Create a deep, breathing ambient glow ring
 	ambientGlow = Instance.new("ImageLabel", container)
@@ -72,10 +41,7 @@ function UIAuraManager.ApplyAura(container, auraData)
 
 			local p = Instance.new("ImageLabel", container)
 			p.BackgroundTransparency = 1
-
-			-- Randomly select a particle ID from our table
-			p.Image = PARTICLE_IDS[math.random(1, #PARTICLE_IDS)]
-
+			p.Image = "rbxassetid://1316045217" -- Glowing soft particle
 			p.ImageColor3 = math.random() > 0.5 and c1 or c2
 			p.ZIndex = 2
 
