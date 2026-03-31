@@ -16,7 +16,7 @@ local LogText, ActionGrid
 local PlayerHPBar, PlayerHPText, PlayerNameText, PlayerStatusBox, PlayerGasBar, PlayerGasText
 local EnemyHPBar, EnemyHPText, EnemyNameText, EnemyStatusBox, EnemyShieldBar
 local PlayerNrgBar, PlayerNrgText, PlayerNrgContainer
-local WaveLabel, LeaveBtn
+local WaveLabel, LeaveBtn, ContinueBtn, PostMatchActionRow
 local pAvatarBox, eAvatarBox
 
 local TargetMenu
@@ -65,8 +65,10 @@ local function ApplyGradient(label, color1, color2)
 	grad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, color1), ColorSequenceKeypoint.new(1, color2)}
 end
 
+-- [[ THE FIX: Restored text isolation so text stays purely white, disabled AutoButtonColor ]]
 local function ApplyButtonGradient(btn, topColor, botColor, strokeColor)
 	btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	btn.AutoButtonColor = false 
 	local grad = btn:FindFirstChildOfClass("UIGradient") or Instance.new("UIGradient", btn)
 	grad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, topColor), ColorSequenceKeypoint.new(1, botColor)}; grad.Rotation = 90
 	local corner = btn:FindFirstChildOfClass("UICorner") or Instance.new("UICorner", btn); corner.CornerRadius = UDim.new(0, 4)
@@ -74,18 +76,38 @@ local function ApplyButtonGradient(btn, topColor, botColor, strokeColor)
 		local stroke = btn:FindFirstChildOfClass("UIStroke") or Instance.new("UIStroke", btn)
 		stroke.Color = strokeColor; stroke.Thickness = 1; stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; stroke.LineJoinMode = Enum.LineJoinMode.Miter
 	end
+
 	if not btn:GetAttribute("GradientTextFixed") then
 		btn:SetAttribute("GradientTextFixed", true)
-		local textLbl = Instance.new("TextLabel", btn); textLbl.Name = "BtnTextLabel"; textLbl.Size = UDim2.new(1, 0, 1, 0); textLbl.BackgroundTransparency = 1
-		textLbl.Font = btn.Font; textLbl.TextSize = btn.TextSize; textLbl.TextScaled = btn.TextScaled; textLbl.RichText = btn.RichText; textLbl.TextWrapped = btn.TextWrapped
-		textLbl.TextXAlignment = btn.TextXAlignment; textLbl.TextYAlignment = btn.TextYAlignment; textLbl.ZIndex = btn.ZIndex + 1
-		local tConstraint = btn:FindFirstChildOfClass("UITextSizeConstraint"); if tConstraint then tConstraint.Parent = textLbl end
-		btn.ChildAdded:Connect(function(child) if child:IsA("UITextSizeConstraint") then task.delay(0, function() child.Parent = textLbl end) end end)
-		textLbl.Text = btn.Text; textLbl.TextColor3 = btn.TextColor3; btn.Text = ""
-		btn:GetPropertyChangedSignal("Text"):Connect(function() if btn.Text ~= "" then textLbl.Text = btn.Text; btn.Text = "" end end)
+		local textLbl = Instance.new("TextLabel", btn)
+		textLbl.Name = "BtnTextLabel"
+		textLbl.Size = UDim2.new(1, 0, 1, 0)
+		textLbl.BackgroundTransparency = 1
+		textLbl.Font = btn.Font
+		textLbl.TextSize = btn.TextSize
+		textLbl.TextScaled = btn.TextScaled
+		textLbl.RichText = btn.RichText
+		textLbl.TextWrapped = btn.TextWrapped
+		textLbl.TextXAlignment = btn.TextXAlignment
+		textLbl.TextYAlignment = btn.TextYAlignment
+		textLbl.ZIndex = btn.ZIndex + 1
+
+		local tConstraint = btn:FindFirstChildOfClass("UITextSizeConstraint")
+		if tConstraint then tConstraint.Parent = textLbl end
+
+		btn.ChildAdded:Connect(function(child) 
+			if child:IsA("UITextSizeConstraint") then task.delay(0, function() child.Parent = textLbl end) end 
+		end)
+
+		textLbl.Text = btn.Text
+		textLbl.TextColor3 = btn.TextColor3
+		btn.Text = ""
+
+		btn:GetPropertyChangedSignal("Text"):Connect(function() 
+			if btn.Text ~= "" then textLbl.Text = btn.Text; btn.Text = "" end 
+		end)
 		btn:GetPropertyChangedSignal("TextColor3"):Connect(function() textLbl.TextColor3 = btn.TextColor3 end)
 		btn:GetPropertyChangedSignal("RichText"):Connect(function() textLbl.RichText = btn.RichText end)
-		btn:GetPropertyChangedSignal("TextSize"):Connect(function() textLbl.TextSize = btn.TextSize end)
 	end
 end
 
@@ -194,6 +216,7 @@ function CombatTab.Init(parentFrame, tooltipMgr)
 	AmbientContainer.ZIndex = 50 
 	AmbientContainer.Visible = false
 
+	-- [[ MOBILE RELATIVE SIZE FIX ]]
 	MainFrame = Instance.new("Frame", parentFrame.Parent)
 	MainFrame.Name = "CombatFrame"
 	MainFrame.Size = UDim2.new(0.95, 0, 0.95, 0) 
@@ -216,7 +239,7 @@ function CombatTab.Init(parentFrame, tooltipMgr)
 	PathsShopOverlay.Visible = false
 
 	PSModal = Instance.new("Frame", PathsShopOverlay)
-	PSModal.Size = UDim2.new(0.95, 0, 0.95, 0)
+	PSModal.Size = UDim2.new(0.95, 0, 0.95, 0) -- [[ MOBILE RELATIVE SIZE ]]
 	PSModal.Position = UDim2.new(0.5, 0, 0.5, 0)
 	PSModal.AnchorPoint = Vector2.new(0.5, 0.5)
 	PSModal.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
@@ -348,12 +371,13 @@ function CombatTab.Init(parentFrame, tooltipMgr)
 	local grad = Instance.new("UIGradient", WaveLabel); grad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 215, 100)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 150, 50))}
 
 	local CombatantsFrame = Instance.new("Frame", MainFrame)
-	CombatantsFrame.Size = UDim2.new(0.98, 0, 0, 95); CombatantsFrame.BackgroundTransparency = 1
+	CombatantsFrame.Size = UDim2.new(0.96, 0, 0, 95); CombatantsFrame.BackgroundTransparency = 1
 	CombatantsFrame.LayoutOrder = 2
 
 	local PlayerPanel = Instance.new("Frame", CombatantsFrame)
 	PlayerPanel.Size = UDim2.new(0.46, 0, 1, 0); PlayerPanel.Position = UDim2.new(0, 0, 0, 0); PlayerPanel.BackgroundTransparency = 1
 
+	-- [[ Mobile 65x65 Avatars ]]
 	pAvatarBox = Instance.new("Frame", PlayerPanel)
 	pAvatarBox.Size = UDim2.new(0, 65, 0, 65); pAvatarBox.Position = UDim2.new(0, 0, 0.5, 0); pAvatarBox.AnchorPoint = Vector2.new(0, 0.5); pAvatarBox.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
 	Instance.new("UIStroke", pAvatarBox).Color = Color3.fromRGB(80, 120, 200); Instance.new("UIStroke", pAvatarBox).Thickness = 2; Instance.new("UIStroke", pAvatarBox).LineJoinMode = Enum.LineJoinMode.Miter
@@ -381,6 +405,7 @@ function CombatTab.Init(parentFrame, tooltipMgr)
 	local EnemyPanel = Instance.new("Frame", CombatantsFrame)
 	EnemyPanel.Size = UDim2.new(0.46, 0, 1, 0); EnemyPanel.Position = UDim2.new(0.54, 0, 0, 0); EnemyPanel.BackgroundTransparency = 1
 
+	-- [[ Mobile 65x65 Avatars ]]
 	eAvatarBox = Instance.new("Frame", EnemyPanel)
 	eAvatarBox.Size = UDim2.new(0, 65, 0, 65); eAvatarBox.Position = UDim2.new(1, 0, 0.5, 0); eAvatarBox.AnchorPoint = Vector2.new(1, 0.5); eAvatarBox.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 	Instance.new("UIStroke", eAvatarBox).Color = Color3.fromRGB(255, 100, 100); Instance.new("UIStroke", eAvatarBox).Thickness = 2; Instance.new("UIStroke", eAvatarBox).LineJoinMode = Enum.LineJoinMode.Miter
@@ -417,6 +442,7 @@ function CombatTab.Init(parentFrame, tooltipMgr)
 	ActionGrid.Size = UDim2.new(1, 0, 1, 0); ActionGrid.BackgroundTransparency = 1; ActionGrid.ScrollBarThickness = 0; ActionGrid.BorderSizePixel = 0
 	local gridLayout = Instance.new("UIGridLayout", ActionGrid)
 
+	-- [[ Mobile Relative Grid Layout ]]
 	gridLayout.CellSize = UDim2.new(0.48, 0, 0, 38)
 	gridLayout.CellPadding = UDim2.new(0.03, 0, 0, 6)
 	gridLayout.SortOrder = Enum.SortOrder.LayoutOrder; gridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -497,7 +523,24 @@ function CombatTab.Init(parentFrame, tooltipMgr)
 
 	for _, child in ipairs(BodyContainer:GetChildren()) do if child:IsA("TextButton") then child.AnchorPoint = Vector2.new(0.5, 0.5) end end
 
-	LeaveBtn = Instance.new("TextButton", MainFrame); LeaveBtn.Size = UDim2.new(0.8, 0, 0, 45); LeaveBtn.LayoutOrder = 5; LeaveBtn.Font = Enum.Font.GothamBlack; LeaveBtn.TextColor3 = Color3.fromRGB(255, 255, 255); LeaveBtn.TextSize = 14; LeaveBtn.Text = "RETURN TO BASE"; LeaveBtn.Visible = false
+	-- [[ 1. NEW POST-MATCH ACTION ROW ]]
+	PostMatchActionRow = Instance.new("Frame", MainFrame)
+	PostMatchActionRow.Size = UDim2.new(0.98, 0, 0, 45)
+	PostMatchActionRow.BackgroundTransparency = 1
+	PostMatchActionRow.LayoutOrder = 5
+	PostMatchActionRow.Visible = false
+
+	local pmLayout = Instance.new("UIListLayout", PostMatchActionRow)
+	pmLayout.FillDirection = Enum.FillDirection.Horizontal
+	pmLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	pmLayout.Padding = UDim.new(0, 10)
+
+	LeaveBtn = Instance.new("TextButton", PostMatchActionRow)
+	LeaveBtn.Size = UDim2.new(0.48, 0, 1, 0)
+	LeaveBtn.Font = Enum.Font.GothamBlack
+	LeaveBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	LeaveBtn.TextSize = 14
+	LeaveBtn.Text = "RETURN TO BASE"
 	ApplyButtonGradient(LeaveBtn, Color3.fromRGB(80, 180, 80), Color3.fromRGB(40, 100, 40), Color3.fromRGB(20, 80, 20))
 
 	LeaveBtn.MouseButton1Click:Connect(function()
@@ -513,6 +556,21 @@ function CombatTab.Init(parentFrame, tooltipMgr)
 				end
 			end
 		end
+	end)
+
+	ContinueBtn = Instance.new("TextButton", PostMatchActionRow)
+	ContinueBtn.Size = UDim2.new(0.48, 0, 1, 0)
+	ContinueBtn.Font = Enum.Font.GothamBlack
+	ContinueBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	ContinueBtn.TextSize = 14
+	ContinueBtn.Text = "CONTINUE CAMPAIGN"
+	ContinueBtn.Visible = false
+	ApplyButtonGradient(ContinueBtn, Color3.fromRGB(80, 120, 200), Color3.fromRGB(40, 80, 140), Color3.fromRGB(20, 40, 80))
+
+	ContinueBtn.MouseButton1Click:Connect(function()
+		if EffectsManager and type(EffectsManager.PlaySFX) == "function" then EffectsManager.PlaySFX("Click") end
+		PostMatchActionRow.Visible = false
+		Network:WaitForChild("CombatAction"):FireServer("EngageStory")
 	end)
 
 	local function LockGrid()
@@ -620,7 +678,7 @@ function CombatTab.Init(parentFrame, tooltipMgr)
 				CreateBtn("Basic Slash", Color3.fromRGB(120, 40, 40), 1)
 				CreateBtn("Maneuver", Color3.fromRGB(40, 80, 140), 2)
 
-				-- 2. DYNAMIC RANGE BUTTON (Swaps automatically based on your distance)
+				-- 2. DYNAMIC RANGE BUTTON
 				if battleState.Context.Range == "Long" then
 					CreateBtn("Close In", Color3.fromRGB(80, 100, 140), 3)
 				else
@@ -638,7 +696,6 @@ function CombatTab.Init(parentFrame, tooltipMgr)
 				-- 4. Equipped Style Skills
 				local orderIndex = 7
 				for sName, sData in pairs(SkillData.Skills) do
-					-- Make sure to hide BOTH of the dynamic skills from the loop so they don't duplicate
 					if sName == "Basic Slash" or sName == "Maneuver" or sName == "Fall Back" or sName == "Close In" or sName == "Recover" or sName == "Retreat" or sName == "Transform" then continue end
 					if sName == "Anti-Titan Rifle" and battleState.Context.Range ~= "Long" then continue end
 
@@ -709,7 +766,7 @@ function CombatTab.Init(parentFrame, tooltipMgr)
 				if topGui:FindFirstChild("TopBar") then topGui.TopBar.Visible = false end
 				if topGui:FindFirstChild("NavBar") then topGui.NavBar.Visible = false end
 			end
-			LeaveBtn.Visible = false; BottomArea.Visible = true; isBattleActive = true
+			PostMatchActionRow.Visible = false; BottomArea.Visible = true; isBattleActive = true
 
 			if data.Battle and data.Battle.Context.IsPaths then StartPathsAmbient() end
 
@@ -743,7 +800,24 @@ function CombatTab.Init(parentFrame, tooltipMgr)
 		elseif action == "Victory" then
 			if EffectsManager and type(EffectsManager.PlaySFX) == "function" then EffectsManager.PlaySFX("Victory", 1) end
 			SyncBars(data.Battle); isBattleActive = false; LockGrid()
-			BottomArea.Visible = false; LeaveBtn.Visible = true; LeaveBtn.Text = "VICTORY - RETURN"; ApplyButtonGradient(LeaveBtn, Color3.fromRGB(80, 200, 80), Color3.fromRGB(40, 100, 40), Color3.fromRGB(20, 80, 20))
+			BottomArea.Visible = false; PostMatchActionRow.Visible = true
+			LeaveBtn.Text = "VICTORY - RETURN"
+			ApplyButtonGradient(LeaveBtn, Color3.fromRGB(80, 200, 80), Color3.fromRGB(40, 100, 40), Color3.fromRGB(20, 80, 20))
+
+			if data.Battle and data.Battle.Context.IsStoryMission then
+				local cPart = player:GetAttribute("CurrentPart") or 1
+				if cPart > 8 then
+					ContinueBtn.Visible = false
+					LeaveBtn.Size = UDim2.new(0.8, 0, 1, 0)
+				else
+					ContinueBtn.Visible = true
+					LeaveBtn.Size = UDim2.new(0.48, 0, 1, 0)
+				end
+			else
+				ContinueBtn.Visible = false
+				LeaveBtn.Size = UDim2.new(0.8, 0, 1, 0)
+			end
+
 			AddLogMessage("<b><font color='#55FF55'>ENEMY DEFEATED!</font></b>", false)
 			local xpAmt = data.XP or 0; local dewsAmt = data.Dews or 0
 			local rewardStr = "<font color='#55FF55'>Rewards: +" .. xpAmt .. " XP | +" .. dewsAmt .. " Dews</font>"
@@ -754,7 +828,9 @@ function CombatTab.Init(parentFrame, tooltipMgr)
 		elseif action == "Defeat" then
 			if EffectsManager and type(EffectsManager.PlaySFX) == "function" then EffectsManager.PlaySFX("Defeat", 1) end
 			SyncBars(data.Battle); isBattleActive = false; LockGrid()
-			BottomArea.Visible = false; LeaveBtn.Visible = true; LeaveBtn.Text = "DEFEAT - RETREAT"; ApplyButtonGradient(LeaveBtn, Color3.fromRGB(200, 80, 80), Color3.fromRGB(100, 40, 40), Color3.fromRGB(80, 20, 20))
+			BottomArea.Visible = false; PostMatchActionRow.Visible = true; ContinueBtn.Visible = false
+			LeaveBtn.Size = UDim2.new(0.8, 0, 1, 0)
+			LeaveBtn.Text = "DEFEAT - RETREAT"; ApplyButtonGradient(LeaveBtn, Color3.fromRGB(200, 80, 80), Color3.fromRGB(100, 40, 40), Color3.fromRGB(80, 20, 20))
 			AddLogMessage("<b><font color='#FF5555'>YOU WERE SLAUGHTERED.</font></b>", false)
 
 		elseif action == "PathsDeath" then
@@ -813,7 +889,9 @@ function CombatTab.Init(parentFrame, tooltipMgr)
 					PathsShopOverlay.Visible = false
 				end
 			else
-				BottomArea.Visible = false; LeaveBtn.Visible = true; LeaveBtn.Text = "COWARD - RETURN"; ApplyButtonGradient(LeaveBtn, Color3.fromRGB(150, 150, 150), Color3.fromRGB(80, 80, 80), Color3.fromRGB(50, 50, 50))
+				BottomArea.Visible = false; PostMatchActionRow.Visible = true; ContinueBtn.Visible = false
+				LeaveBtn.Size = UDim2.new(0.8, 0, 1, 0)
+				LeaveBtn.Text = "COWARD - RETURN"; ApplyButtonGradient(LeaveBtn, Color3.fromRGB(150, 150, 150), Color3.fromRGB(80, 80, 80), Color3.fromRGB(50, 50, 50))
 				AddLogMessage("<b><font color='#AAAAAA'>You fired a smoke signal and fled.</font></b>", false)
 			end
 		end
