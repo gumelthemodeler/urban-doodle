@@ -24,7 +24,6 @@ SkillData.Skills = {
 	["Titan Kick"] = { Requirement = "Transformed", Range = "Close", Type = "Basic", Mult = 2.5, EnergyCost = 0, GasCost = 0, Cooldown = 2, Order = 4, SFX = "Kick", VFX = "ExplosionMark", Description = "A sweeping kick that knocks the enemy back." },
 	["Cannibalize"] = { Requirement = "Transformed", Range = "Close", Type = "Titan", Mult = 1.5, EnergyCost = 0, Cooldown = 4, Order = 5, Effect = "RestoreHeat", SFX = "Bite", VFX = "ClawMark", Description = "Viciously bite the enemy, restoring 40 Heat and 15% HP." },
 
-	-- [[ REBALANCE: Multi-Hit skill multipliers divided by hit count to prevent massive broken total damage outputs ]]
 	-- [[ BASE ODM SYNERGY CHAIN ]]
 	["Spinning Slash"] = { Requirement = "ODM", Range = "Close", Type = "Style", Mult = 0.45, Hits = 3, GasCost = 20, Order = 7, ComboReq = "Basic Slash", ComboMult = 1.3, SFX = "SpinSlash", VFX = "SlashMark", Description = "Burn gas to rapidly spin and slash the target 3 times." },
 	["Nape Strike"] = { Requirement = "ODM", Range = "Close", Type = "Style", Mult = 2.5, Effect = "Bleed", Duration = 3, GasCost = 25, Cooldown = 4, Order = 8, ComboReq = "Spinning Slash", ComboMult = 1.5, SFX = "HeavySlash", VFX = "SlashMark", Description = "A precise, lethal strike to the vital point. Causes Bleed." },
@@ -62,10 +61,14 @@ SkillData.Skills = {
 	["Colossal Steam"] = { Requirement = "Colossal Titan", Range = "Any", Type = "Titan", Mult = 1.5, Hits = 2, Effect = "Burn", Duration = 3, EnergyCost = 50, Cooldown = 7, Order = 13, SFX = "Steam", VFX = "ExplosionMark", Description = "Emit waves of scorching steam, burning anyone nearby." },
 	["Coordinate Command"] = { Requirement = "Founding Titan", Range = "Any", Type = "Titan", Mult = 6.0, Effect = "Stun", Duration = 3, EnergyCost = 80, Cooldown = 8, Order = 13, SFX = "Roar", VFX = "ClawMark", Description = "Command pure titans to swarm and crush the enemy completely." },
 
+	-- [[ TRANSCENDENT FUSION MOVES ]]
 	["Coordinate Crystal Strike"] = { Requirement = "Founding Female Titan", Range = "Any", Type = "Titan", Mult = 6.0, Effect = "Stun", Duration = 3, EnergyCost = 60, Cooldown = 6, Order = 11, SFX = "Spike", VFX = "ClawMark", Description = "Summon pure titans encased in hardening to obliterate the target." },
 	["Armored Berserk"] = { Requirement = "Armored Attack Titan", Range = "Close", Type = "Titan", Mult = 5.0, Effect = "Debuff_Defense", Duration = 3, EnergyCost = 50, Cooldown = 5, Order = 11, SFX = "HeavyPunch", VFX = "ExplosionMark", Description = "A relentless, armored barrage that shreds defense." },
 	["War Hammer Onslaught"] = { Requirement = "War Hammer Attack Titan", Range = "Close", Type = "Titan", Mult = 5.5, Effect = "Bleed", Duration = 4, EnergyCost = 55, Cooldown = 5, Order = 11, SFX = "Spike", VFX = "SlashMark", Description = "Creates weapons from the earth, striking with immense power." },
 	["Steam Bite"] = { Requirement = "Colossal Jaw Titan", Range = "Close", Type = "Titan", Mult = 4.5, Effect = "Burn", Duration = 3, EnergyCost = 45, Cooldown = 4, Order = 11, SFX = "Bite", VFX = "ExplosionMark", Description = "A scorching, hyper-fast bite that melts armor." },	
+
+	-- [[ FIX: ADDED FOUNDING ATTACK TITAN EXCLUSIVE MOVE ]]
+	["Rumbling Advance"] = { Requirement = "Founding Attack Titan", Range = "Any", Type = "Titan", Mult = 6.5, Effect = "Stun", Duration = 3, EnergyCost = 60, Cooldown = 6, Order = 11, SFX = "Roar", VFX = "ExplosionMark", Description = "Command the Wall Titans to advance, crushing everything in their path." },
 
 	-- [[ ENEMY EXCLUSIVE MOVES ]]
 	["Titan Grab"] = { Requirement = "Enemy", Range = "Close", Type = "Titan", Mult = 1.2, Effect = "Stun", Duration = 1, Cooldown = 3, SFX = "Dash", VFX = "ClawMark", Description = "The Titan attempts to grab the target." },
