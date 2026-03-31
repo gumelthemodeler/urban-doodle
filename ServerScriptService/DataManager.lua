@@ -9,12 +9,12 @@ local MessagingService = game:GetService("MessagingService")
 local BountyData = require(ReplicatedStorage:WaitForChild("BountyData"))
 local ItemData = require(ReplicatedStorage:WaitForChild("ItemData"))
 
-local GameDataStore = DataStoreService:GetDataStore("AoT_Data_V6") -- Changed to V6
-local BackupDataStore = DataStoreService:GetDataStore("AoT_Backups_V3") -- Changed to V3
-local RegimentStore = DataStoreService:GetDataStore("RegimentWars_V3") -- Changed to V3
+local GameDataStore = DataStoreService:GetDataStore("AoT_Data_V6")
+local BackupDataStore = DataStoreService:GetDataStore("AoT_Backups_V3")
+local RegimentStore = DataStoreService:GetDataStore("RegimentWars_V4") -- Upgraded to V4 for Turf War Map
 
-local PrestigeLB = DataStoreService:GetOrderedDataStore("Global_Prestige_LB_V3") -- Changed to V3
-local EloLB = DataStoreService:GetOrderedDataStore("Global_Elo_LB_V3") -- Changed to V3
+local PrestigeLB = DataStoreService:GetOrderedDataStore("Global_Prestige_LB_V3")
+local EloLB = DataStoreService:GetOrderedDataStore("Global_Elo_LB_V3")
 local LBCache = { Prestige = {}, Elo = {} }
 
 local RemotesFolder = ReplicatedStorage:FindFirstChild("Network") or Instance.new("Folder", ReplicatedStorage)
@@ -24,7 +24,7 @@ local requiredRemotes = {
 	"ToggleMute", "CombatAction", "CombatUpdate", "PrestigeEvent", "NotificationEvent", "DungeonUpdate", "WorldBossUpdate", "WorldBossAction", 
 	"RaidAction", "RaidUpdate", "ToggleTraining", "ShopAction", "ShopUpdate", "UpgradeStat", "TrainAction", "EquipItem", "SellItem", "AutoSell", "AdminCommand",
 	"GachaRoll", "GachaRollAuto", "GachaResult", "AwakenAction", "ManageStorage", "VIPFreeReroll", "RedeemCode", "ClaimBounty", "ForgeItem", "ConsumeItem", "JoinRegiment", "ShowRegimentUI",
-	"FuseTitan", "PathsShopBuy", "AwakenWeapon", "DispatchAction", "TradeAction", "TradeUpdate", "TradeRequest"
+	"FuseTitan", "PathsShopBuy", "AwakenWeapon", "DispatchAction", "TradeAction", "TradeUpdate", "TradeRequest", "DeployToDistrict"
 }
 
 for _, remoteName in ipairs(requiredRemotes) do
@@ -48,9 +48,7 @@ lbRf.OnServerInvoke = function(player, lbType)
 	local cache = LBCache[lbType] or {}
 	local dynamicList = {}
 
-	for _, entry in ipairs(cache) do
-		table.insert(dynamicList, {Name = entry.Name, Value = entry.Value})
-	end
+	for _, entry in ipairs(cache) do table.insert(dynamicList, {Name = entry.Name, Value = entry.Value}) end
 
 	for _, p in ipairs(Players:GetPlayers()) do
 		local ls = p:FindFirstChild("leaderstats")
@@ -61,61 +59,81 @@ lbRf.OnServerInvoke = function(player, lbType)
 
 			local found = false
 			for _, entry in ipairs(dynamicList) do
-				if entry.Name == p.Name then
-					entry.Value = liveVal
-					found = true
-					break
-				end
+				if entry.Name == p.Name then entry.Value = liveVal; found = true; break end
 			end
-
-			if not found and (lbType == "Elo" or liveVal > 0) then
-				table.insert(dynamicList, {Name = p.Name, Value = liveVal})
-			end
+			if not found and (lbType == "Elo" or liveVal > 0) then table.insert(dynamicList, {Name = p.Name, Value = liveVal}) end
 		end
 	end
-
 	table.sort(dynamicList, function(a, b) return a.Value > b.Value end)
-
 	local finalList = {}
 	for i = 1, math.min(50, #dynamicList) do
-		if lbType == "Elo" or dynamicList[i].Value > 0 then
-			table.insert(finalList, {Rank = i, Name = dynamicList[i].Name, Value = dynamicList[i].Value})
-		end
+		if lbType == "Elo" or dynamicList[i].Value > 0 then table.insert(finalList, {Rank = i, Name = dynamicList[i].Name, Value = dynamicList[i].Value}) end
 	end
 	return finalList
 end
 
 local DefaultData = { 
 	Prestige = 0, CurrentPart = 1, CurrentMission = 1, CurrentWave = 1, XP = 0, TitanXP = 0, Dews = 0, Elo = 1000, 
-	Titan = "None", FightingStyle = "None", Clan = "None", Regiment = "Cadet Corps", 
+	Titan = "None", FightingStyle = "None", Clan = "None", Regiment = "Cadet Corps", DeployedDistrict = "Trost District",
 	TitanPity = 0, TitanMythicalPity = 0, ClanPity = 0, ClanMythicalPity = 0, 
 	EquippedWeapon = "None", EquippedAccessory = "None", PathDust = 0, PathsFloor = 1, 
 	DispatchData = "{}", AllyLevels = "{}", UnlockedAllies = "", MaxDeployments = 2, 
-	Health = 10, Strength = 10, Defense = 10, Speed = 10, Gas = 10, Resolve = 10, LastFreeReroll = 0, RedeemedCodes = "", RewardClaimedWeek = 0,
+	Health = 10, Strength = 10, Defense = 10, Speed = 10, Gas = 10, Resolve = 10, LastFreeReroll = 0, RedeemedCodes = "",
 	LoginStreak = 0, LastLoginDate = "", AutoTrainSessionTime = 0 
 }
 
-local CurrentVP = { ["Scout Regiment"] = 0, ["Garrison"] = 0, ["Military Police"] = 0, Week = math.floor(os.time() / 604800), Winner = "None" }
-local winVal = Instance.new("StringValue", RemotesFolder); winVal.Name = "WinningRegiment"; winVal.Value = "None"
+-- [[ NEW: Turf War District Structure ]]
+local CurrentVP = {
+	Week = math.floor(os.time() / 604800),
+	Districts = {
+		["Trost District"] = { ["Scout Regiment"] = 0, ["Garrison"] = 0, ["Military Police"] = 0, Winner = "None" },
+		["Stohess District"] = { ["Scout Regiment"] = 0, ["Garrison"] = 0, ["Military Police"] = 0, Winner = "None" },
+		["Shiganshina"] = { ["Scout Regiment"] = 0, ["Garrison"] = 0, ["Military Police"] = 0, Winner = "None" },
+		["Karanes District"] = { ["Scout Regiment"] = 0, ["Garrison"] = 0, ["Military Police"] = 0, Winner = "None" }
+	}
+}
+
 local GetVpRf = Instance.new("RemoteFunction", RemotesFolder); GetVpRf.Name = "GetRegimentVP"
 GetVpRf.OnServerInvoke = function() return CurrentVP end
 
-pcall(function() local data = RegimentStore:GetAsync("GlobalWarData") if data then CurrentVP = data; winVal.Value = data.Winner or "None" end end)
+pcall(function() 
+	local data = RegimentStore:GetAsync("GlobalWarData_V4") 
+	if data and data.Districts then CurrentVP = data end 
+end)
 
 local vpEvent = Instance.new("BindableEvent", game:GetService("ServerStorage")); vpEvent.Name = "AddRegimentVP"
 vpEvent.Event:Connect(function(player, amount)
 	local reg = player:GetAttribute("Regiment")
-	if CurrentVP[reg] then CurrentVP[reg] += amount end
+	local deployedTo = player:GetAttribute("DeployedDistrict") or "Trost District"
+	if CurrentVP.Districts[deployedTo] and CurrentVP.Districts[deployedTo][reg] then 
+		CurrentVP.Districts[deployedTo][reg] += amount 
+	end
+end)
+
+RemotesFolder.DeployToDistrict.OnServerEvent:Connect(function(player, districtName)
+	if CurrentVP.Districts[districtName] then
+		player:SetAttribute("DeployedDistrict", districtName)
+		RemotesFolder.NotificationEvent:FireClient(player, "Forces deployed to " .. districtName .. "!", "Success")
+	end
 end)
 
 task.spawn(function()
 	while true do
 		local currentWeek = math.floor(os.time() / 604800)
 		if currentWeek > CurrentVP.Week then
-			local winner = "None"; local highest = -1
-			for reg, vp in pairs(CurrentVP) do if reg ~= "Week" and reg ~= "Winner" and vp > highest then highest = vp; winner = reg end end
-			CurrentVP = { ["Scout Regiment"] = 0, ["Garrison"] = 0, ["Military Police"] = 0, Week = currentWeek, Winner = winner }; winVal.Value = winner
-			pcall(function() RegimentStore:SetAsync("GlobalWarData", CurrentVP) end)
+			-- Calculate winners for all districts at the end of the week!
+			for dName, dData in pairs(CurrentVP.Districts) do
+				local winner = "None"; local highest = -1
+				for reg, vp in pairs(dData) do 
+					if reg ~= "Winner" and type(vp) == "number" and vp > highest then 
+						highest = vp; winner = reg 
+					end 
+				end
+				dData.Winner = winner
+				dData["Scout Regiment"] = 0; dData["Garrison"] = 0; dData["Military Police"] = 0
+			end
+			CurrentVP.Week = currentWeek
+			pcall(function() RegimentStore:SetAsync("GlobalWarData_V4", CurrentVP) end)
 		end
 
 		pcall(function()
@@ -153,11 +171,8 @@ RemotesFolder.ClaimBounty.OnServerEvent:Connect(function(player, bType)
 		player:SetAttribute(claimedAttr, true)
 		vpEvent:Fire(player, 25)
 
-		local hasBuff = winVal.Value ~= "None" and player:GetAttribute("Regiment") == winVal.Value
-
 		if string.sub(bType, 1, 1) == "D" then
 			local reward = player:GetAttribute(bType .. "_Reward") or 500
-			if hasBuff then reward = math.floor(reward * 1.15) end
 			player.leaderstats.Dews.Value += reward
 		else
 			local rType = player:GetAttribute(bType .. "_RewardType")
@@ -230,11 +245,6 @@ RemotesFolder.AdminCommand.OnServerEvent:Connect(function(player, command, targe
 	elseif command == "SetTitan" then targetPlayer:SetAttribute("Titan", tostring(args))
 	elseif command == "SetClan" then targetPlayer:SetAttribute("Clan", tostring(args))
 	elseif command == "SetTitle" then targetPlayer:SetAttribute("CustomTitle", tostring(args))
-	elseif command == "MaxStats" then
-		local GameDataInfo = require(ReplicatedStorage:WaitForChild("GameData"))
-		local p = targetPlayer.leaderstats.Prestige.Value; local c = GameDataInfo.GetStatCap(p)
-		local statsToMax = {"Health", "Strength", "Defense", "Speed", "Gas", "Resolve", "Titan_Power_Val", "Titan_Speed_Val", "Titan_Hardening_Val", "Titan_Endurance_Val", "Titan_Precision_Val", "Titan_Potential_Val"}
-		for _, s in ipairs(statsToMax) do targetPlayer:SetAttribute(s, c) end
 	elseif command == "WipePlayer" then
 		targetPlayer.leaderstats.Prestige.Value = 0; targetPlayer.leaderstats.Dews.Value = 0; targetPlayer.leaderstats.Elo.Value = 1000
 
@@ -256,7 +266,6 @@ RemotesFolder.AdminCommand.OnServerEvent:Connect(function(player, command, targe
 	end
 end)
 
--- [[ THE FIX: Forces bounties to load properly even if attributes were wiped ]]
 local function RollBounties(player)
 	local now = os.time(); local currentDay = math.floor(now / 86400); local currentWeek = math.floor(now / 604800)
 
@@ -320,9 +329,18 @@ local function LoadPlayer(player)
 	for k, v in pairs(DefaultData) do if k ~= "Prestige" and k ~= "Dews" and k ~= "Elo" then player:SetAttribute(k, data[k] or v) end end
 	for k, v in pairs(data) do if DefaultData[k] == nil and k ~= "Prestige" and k ~= "Dews" and k ~= "Elo" then player:SetAttribute(k, v) end end
 
-	if CurrentVP.Winner ~= "None" and player:GetAttribute("Regiment") == CurrentVP.Winner and player:GetAttribute("RewardClaimedWeek") ~= CurrentVP.Week then
-		player:SetAttribute("RewardClaimedWeek", CurrentVP.Week); player:SetAttribute("TitanHardeningExtractCount", (player:GetAttribute("TitanHardeningExtractCount") or 0) + 2); player:SetAttribute("AncestralAwakeningSerumCount", (player:GetAttribute("AncestralAwakeningSerumCount") or 0) + 1)
-		task.delay(3, function() RemotesFolder.NotificationEvent:FireClient(player, "Your Regiment won the war! Received Forge Chest!", "Success") end)
+	-- [[ FIX: Check all districts for weekly rewards ]]
+	local myReg = player:GetAttribute("Regiment")
+	if myReg then
+		for dName, dData in pairs(CurrentVP.Districts) do
+			if dData.Winner == myReg and player:GetAttribute("RewardClaimedWeek_"..dName) ~= CurrentVP.Week then
+				player:SetAttribute("RewardClaimedWeek_"..dName, CurrentVP.Week)
+
+				player.leaderstats.Dews.Value += 25000
+				player:SetAttribute("TitanHardeningExtractCount", (player:GetAttribute("TitanHardeningExtractCount") or 0) + 1)
+				task.delay(3, function() RemotesFolder.NotificationEvent:FireClient(player, "Your Regiment secured " .. dName .. " this week! (+25k Dews, +1 Extract)", "Success") end)
+			end
+		end
 	end
 
 	local LoginData = require(ReplicatedStorage:WaitForChild("LoginData"))
