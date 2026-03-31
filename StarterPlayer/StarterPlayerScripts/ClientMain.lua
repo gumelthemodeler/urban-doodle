@@ -110,7 +110,7 @@ else
 end
 
 local NavStructure = {
-	["PLAYER"] = { {Id="Profile", Name="PROFILE"}, {Id="Stats", Name="STATS"}, {Id="Inherit", Name="INHERIT"} },
+	["PLAYER"] = { {Id="Profile", Name="PROFILE"}, {Id="Stats", Name="STATS"}, {Id="Inherit", Name="INHERIT"}, {Id="Prestige", Name="TALENTS"} }, -- <--- ADDED HERE
 	["OPERATIONS"] = { {Id="Battle", Name="COMBAT"}, {Id="Bounties", Name="BOUNTIES"}, {Id="Dispatch", Name="EXPEDITIONS"}, {Id="PVP", Name="PVP"} },
 	["SUPPLY"] = { {Id="Shop", Name="SHOP"}, {Id="Forge", Name="FORGE"}, {Id="Trade", Name="TRADE"} }
 }
@@ -303,6 +303,8 @@ task.spawn(function()
 		TabModules["PVP"].Init(ContentFrame, TooltipManager)
 		TabModules["RaidCombat"] = require(uiModulesFolder:WaitForChild("RaidTab"))
 		TabModules["RaidCombat"].Init(ContentFrame, TooltipManager)
+		TabModules["Prestige"] = require(uiModulesFolder:WaitForChild("PrestigeTab"))
+		TabModules["Prestige"].Init(ContentFrame)
 
 		-- [[ THE FIX: Wrap Admin Tab Require in isAdmin check ]]
 		if isAdmin then
