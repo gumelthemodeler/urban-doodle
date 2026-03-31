@@ -24,11 +24,14 @@ CosmeticData.Auras = {
 function CosmeticData.CheckUnlock(player, reqType, reqValue)
 	if reqType == "None" then return true end
 
+	-- [[ FIX: Safely check for leaderstats so the client doesn't crash on boot ]]
+	local ls = player:FindFirstChild("leaderstats")
+
 	if reqType == "Prestige" then
-		local prestige = player.leaderstats and player.leaderstats:FindFirstChild("Prestige") and player.leaderstats.Prestige.Value or 0
+		local prestige = (ls and ls:FindFirstChild("Prestige")) and ls.Prestige.Value or 0
 		return prestige >= reqValue
 	elseif reqType == "Elo" then
-		local elo = player.leaderstats and player.leaderstats:FindFirstChild("Elo") and player.leaderstats.Elo.Value or 1000
+		local elo = (ls and ls:FindFirstChild("Elo")) and ls.Elo.Value or 1000
 		return elo >= reqValue
 	elseif reqType == "Achievement" then
 		return player:GetAttribute("Ach_" .. reqValue) == true
