@@ -8,16 +8,21 @@ local TweenService = game:GetService("TweenService")
 local Network = ReplicatedStorage:WaitForChild("Network")
 local ItemData = require(ReplicatedStorage:WaitForChild("ItemData"))
 local GameData = require(ReplicatedStorage:WaitForChild("GameData"))
+local CosmeticData = require(ReplicatedStorage:WaitForChild("CosmeticData"))
 
 local NotificationManager = require(script.Parent.Parent:WaitForChild("UIModules"):WaitForChild("NotificationManager"))
+local UIAuraManager = require(script.Parent.Parent:WaitForChild("UIModules"):WaitForChild("UIAuraManager"))
 
 local player = Players.LocalPlayer
-local MainFrame
+local MainFrame, ContentArea
+local SubTabs, SubBtns = {}, {}
+
 local InvGrid
 local wpnLabel, accLabel, titanLabel, clanLabel, regimentLabel
 local titanAwakenBtn, clanAwakenBtn, prestigeBtn
-local RadarContainer, regIcon, AvatarBox
+local RadarContainer, regIcon, AvatarBox, AvatarAuraGlow, AvatarTitle
 local toggleStatsBtn
+local prestigeValLbl, eloValLbl, regimentValLbl
 local InvTitle 
 local isShowingTitanStats = false
 local MAX_INVENTORY_CAPACITY = 50
@@ -26,6 +31,10 @@ local RarityColors = { ["Common"] = "#AAAAAA", ["Uncommon"] = "#55FF55", ["Rare"
 local RarityOrder = { Transcendent = 0, Mythical = 1, Legendary = 2, Epic = 3, Rare = 4, Uncommon = 5, Common = 6 }
 local SellValues = { Common = 10, Uncommon = 25, Rare = 75, Epic = 200, Legendary = 500, Mythical = 1500, Transcendent = 0 }
 
+-- [[ DEFINED HEX COLORS FOR REQUESTED TEXT ]]
+local TEXT_COLORS = { PrestigeYellow = "#FFD700", EloBlue = "#55AAFF", DefaultGreen = "#55FF55" }
+local REG_COLORS = { ["Garrison"] = "#FF5555", ["Military Police"] = "#55FF55", ["Scout Regiment"] = "#55AAFF" }
+
 local function ApplyGradient(label, color1, color2)
 	local grad = Instance.new("UIGradient", label)
 	grad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, color1), ColorSequenceKeypoint.new(1, color2)}
@@ -33,62 +42,32 @@ end
 
 local function ApplyButtonGradient(btn, topColor, botColor, strokeColor)
 	btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-
-	local grad = btn:FindFirstChildOfClass("UIGradient") or Instance.new("UIGradient", btn)
-	grad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, topColor), ColorSequenceKeypoint.new(1, botColor)}
-	grad.Rotation = 90
-
-	local corner = btn:FindFirstChildOfClass("UICorner") or Instance.new("UICorner", btn)
-	corner.CornerRadius = UDim.new(0, 4)
-
+	local grad = btn:FindFirstChildOfClass("UIGradient") or Instance.new("UIGradient", btn); grad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, topColor), ColorSequenceKeypoint.new(1, botColor)}; grad.Rotation = 90
+	local corner = btn:FindFirstChildOfClass("UICorner") or Instance.new("UICorner", btn); corner.CornerRadius = UDim.new(0, 4)
 	if strokeColor then
-		local stroke = btn:FindFirstChildOfClass("UIStroke") or Instance.new("UIStroke", btn)
-		stroke.Color = strokeColor
-		stroke.Thickness = 1
-		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		local stroke = btn:FindFirstChildOfClass("UIStroke") or Instance.new("UIStroke", btn); stroke.Color = strokeColor; stroke.Thickness = 1; stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	end
-
 	if not btn:GetAttribute("GradientTextFixed") then
 		btn:SetAttribute("GradientTextFixed", true)
-
-		local textLbl = Instance.new("TextLabel", btn)
-		textLbl.Name = "BtnTextLabel"
-		textLbl.Size = UDim2.new(1, 0, 1, 0)
-		textLbl.BackgroundTransparency = 1
-		textLbl.Font = btn.Font
-		textLbl.TextSize = btn.TextSize
-		textLbl.TextScaled = btn.TextScaled
-		textLbl.RichText = btn.RichText
-		textLbl.TextWrapped = btn.TextWrapped
-		textLbl.TextXAlignment = btn.TextXAlignment
-		textLbl.TextYAlignment = btn.TextYAlignment
-		textLbl.ZIndex = btn.ZIndex + 1
-
-		local tConstraint = btn:FindFirstChildOfClass("UITextSizeConstraint")
-		if tConstraint then tConstraint.Parent = textLbl end
-
-		btn.ChildAdded:Connect(function(child)
-			if child:IsA("UITextSizeConstraint") then
-				task.delay(0, function() child.Parent = textLbl end)
-			end
-		end)
-
-		textLbl.Text = btn.Text
-		textLbl.TextColor3 = btn.TextColor3
-		btn.Text = ""
-
-		btn:GetPropertyChangedSignal("Text"):Connect(function()
-			if btn.Text ~= "" then
-				textLbl.Text = btn.Text
-				btn.Text = ""
-			end
-		end)
-		btn:GetPropertyChangedSignal("TextColor3"):Connect(function()
-			textLbl.TextColor3 = btn.TextColor3
-		end)
+		local textLbl = Instance.new("TextLabel", btn); textLbl.Name = "BtnTextLabel"; textLbl.Size = UDim2.new(1, 0, 1, 0); textLbl.BackgroundTransparency = 1; textLbl.Font = btn.Font; textLbl.TextSize = btn.TextSize; textLbl.TextScaled = btn.TextScaled; textLbl.RichText = btn.RichText; textLbl.TextWrapped = btn.TextWrapped; textLbl.TextXAlignment = btn.TextXAlignment; textLbl.TextYAlignment = btn.TextYAlignment; textLbl.ZIndex = btn.ZIndex + 1
+		local tConstraint = btn:FindFirstChildOfClass("UITextSizeConstraint"); if tConstraint then tConstraint.Parent = textLbl end
+		btn.ChildAdded:Connect(function(child) if child:IsA("UITextSizeConstraint") then task.delay(0, function() child.Parent = textLbl end) end end)
+		textLbl.Text = btn.Text; textLbl.TextColor3 = btn.TextColor3; btn.Text = ""
+		btn:GetPropertyChangedSignal("Text"):Connect(function() if btn.Text ~= "" then textLbl.Text = btn.Text; btn.Text = "" end end)
+		btn:GetPropertyChangedSignal("TextColor3"):Connect(function() textLbl.TextColor3 = btn.TextColor3 end)
 	end
 end
 
+local function TweenGradient(grad, targetTop, targetBot, duration)
+	local startTop = grad.Color.Keypoints[1].Value
+	local startBot = grad.Color.Keypoints[#grad.Color.Keypoints].Value
+	local val = Instance.new("NumberValue"); val.Value = 0
+	local tween = TweenService:Create(val, TweenInfo.new(duration), {Value = 1})
+	val.Changed:Connect(function(v) grad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, startTop:Lerp(targetTop, v)), ColorSequenceKeypoint.new(1, startBot:Lerp(targetBot, v))} end)
+	tween:Play(); tween.Completed:Connect(function() val:Destroy() end)
+end
+
+-- Radar Math Preserved Exactly
 local function DrawLineScale(parent, p1x, p1y, p2x, p2y, color, thickness, zindex)
 	local dx = p2x - p1x; local dy = p2y - p1y; local dist = math.sqrt(dx*dx + dy*dy)
 	local frame = Instance.new("Frame", parent)
@@ -123,85 +102,170 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 	mLayout.SortOrder = Enum.SortOrder.LayoutOrder; mLayout.Padding = UDim.new(0, 15); mLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	local mPad = Instance.new("UIPadding", MainFrame); mPad.PaddingTop = UDim.new(0, 10); mPad.PaddingBottom = UDim.new(0, 30)
 
-	local TopPanel = Instance.new("Frame", MainFrame)
-	TopPanel.Size = UDim2.new(0.95, 0, 0, 480); TopPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 25); TopPanel.LayoutOrder = 1
-	Instance.new("UICorner", TopPanel).CornerRadius = UDim.new(0, 8); Instance.new("UIStroke", TopPanel).Color = Color3.fromRGB(80, 80, 90)
+	-- ==========================================
+	-- [[ 1. TOP COLUMN (AVATAR & INFO FIXED) ]]
+	-- ==========================================
+	local ShowcaseCard = Instance.new("Frame", MainFrame)
+	ShowcaseCard.Size = UDim2.new(0.95, 0, 0, 0); ShowcaseCard.AutomaticSize = Enum.AutomaticSize.Y; ShowcaseCard.BackgroundColor3 = Color3.fromRGB(20, 20, 25); ShowcaseCard.LayoutOrder = 1
+	Instance.new("UICorner", ShowcaseCard).CornerRadius = UDim.new(0, 8); Instance.new("UIStroke", ShowcaseCard).Color = Color3.fromRGB(80, 80, 90)
 
-	local topLayout = Instance.new("UIListLayout", TopPanel)
-	topLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; topLayout.SortOrder = Enum.SortOrder.LayoutOrder; topLayout.Padding = UDim.new(0, 10)
-	local topPad = Instance.new("UIPadding", TopPanel); topPad.PaddingTop = UDim.new(0, 15); topPad.PaddingBottom = UDim.new(0, 15)
+	local scLayout = Instance.new("UIListLayout", ShowcaseCard)
+	scLayout.SortOrder = Enum.SortOrder.LayoutOrder; scLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; scLayout.Padding = UDim.new(0, 10)
+	local scPad = Instance.new("UIPadding", ShowcaseCard); scPad.PaddingTop = UDim.new(0, 20); scPad.PaddingBottom = UDim.new(0, 20)
 
-	local TopHeader = Instance.new("Frame", TopPanel)
-	TopHeader.Size = UDim2.new(1, 0, 0, 90); TopHeader.BackgroundTransparency = 1; TopHeader.LayoutOrder = 1
+	AvatarTitle = Instance.new("TextLabel", ShowcaseCard)
+	AvatarTitle.Size = UDim2.new(1, 0, 0, 25); AvatarTitle.BackgroundTransparency = 1; AvatarTitle.Font = Enum.Font.GothamBlack; AvatarTitle.TextColor3 = Color3.fromRGB(255, 255, 255); AvatarTitle.TextSize = 16; AvatarTitle.Text = "104TH CADET"; AvatarTitle.LayoutOrder = 1; AvatarTitle.ZIndex = 10
 
-	AvatarBox = Instance.new("ImageLabel", TopHeader)
-	AvatarBox.Size = UDim2.new(0, 90, 0, 90); AvatarBox.Position = UDim2.new(0.5, 0, 0.5, 0); AvatarBox.AnchorPoint = Vector2.new(0.5, 0.5); AvatarBox.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
-	AvatarBox.Image = "rbxthumb://type=AvatarHeadShot&id=" .. player.UserId .. "&w=150&h=150"
-	Instance.new("UICorner", AvatarBox).CornerRadius = UDim.new(0, 45); Instance.new("UIStroke", AvatarBox).Color = Color3.fromRGB(120, 100, 60)
+	local AvatarContainer = Instance.new("Frame", ShowcaseCard)
+	AvatarContainer.Size = UDim2.new(0.4, 0, 0.4, 0); AvatarContainer.BackgroundTransparency = 1; AvatarContainer.LayoutOrder = 2
+	Instance.new("UIAspectRatioConstraint", AvatarContainer).AspectRatio = 1.0
 
-	regIcon = Instance.new("ImageLabel", TopHeader)
-	regIcon.Size = UDim2.new(0, 60, 0, 60); regIcon.Position = UDim2.new(0.5, 50, 0.5, 0); regIcon.AnchorPoint = Vector2.new(0, 0.5); regIcon.BackgroundTransparency = 1
+	AvatarAuraGlow = Instance.new("Frame", AvatarContainer)
+	AvatarAuraGlow.Size = UDim2.new(1, 0, 1, 0); AvatarAuraGlow.Position = UDim2.new(0.5, 0, 0.5, 0); AvatarAuraGlow.AnchorPoint = Vector2.new(0.5, 0.5); AvatarAuraGlow.BackgroundTransparency = 1; AvatarAuraGlow.ZIndex = 1
 
-	local NameLabel = Instance.new("TextLabel", TopPanel)
-	NameLabel.Size = UDim2.new(1, 0, 0, 30); NameLabel.BackgroundTransparency = 1; NameLabel.LayoutOrder = 2
-	NameLabel.Font = Enum.Font.GothamBlack; NameLabel.TextColor3 = Color3.fromRGB(255, 255, 255); NameLabel.TextSize = 22; NameLabel.TextXAlignment = Enum.TextXAlignment.Center
-	NameLabel.Text = player.Name
-	ApplyGradient(NameLabel, Color3.fromRGB(255, 215, 100), Color3.fromRGB(255, 150, 50))
+	AvatarBox = Instance.new("ImageLabel", AvatarContainer)
+	AvatarBox.Size = UDim2.new(1, 0, 1, 0); AvatarBox.Position = UDim2.new(0.5, 0, 0.5, 0); AvatarBox.AnchorPoint = Vector2.new(0.5, 0.5); AvatarBox.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+	AvatarBox.Image = "rbxthumb://type=AvatarBust&id="..player.UserId.."&w=420&h=420"; AvatarBox.ZIndex = 5
+	Instance.new("UICorner", AvatarBox).CornerRadius = UDim.new(1, 0); Instance.new("UIStroke", AvatarBox).Color = Color3.fromRGB(100, 100, 110); AvatarBox.UIStroke.Thickness = 2
 
-	RadarContainer = Instance.new("Frame", TopPanel)
-	RadarContainer.Size = UDim2.new(0.9, 0, 0, 200); RadarContainer.BackgroundTransparency = 1; RadarContainer.LayoutOrder = 3
-	Instance.new("UIAspectRatioConstraint", RadarContainer).AspectRatio = 1
+	local PlayerNameLbl = Instance.new("TextLabel", ShowcaseCard)
+	PlayerNameLbl.Size = UDim2.new(1, 0, 0, 30); PlayerNameLbl.BackgroundTransparency = 1; PlayerNameLbl.Font = Enum.Font.GothamBlack; PlayerNameLbl.TextColor3 = Color3.fromRGB(255, 255, 255); PlayerNameLbl.TextSize = 22; PlayerNameLbl.Text = string.upper(player.Name); PlayerNameLbl.LayoutOrder = 3
+	ApplyGradient(PlayerNameLbl, Color3.fromRGB(255, 215, 100), Color3.fromRGB(255, 150, 50))
 
-	local StatsRect = Instance.new("Frame", TopPanel)
-	StatsRect.Size = UDim2.new(0.95, 0, 0, 0); StatsRect.AutomaticSize = Enum.AutomaticSize.Y; StatsRect.BackgroundTransparency = 1; StatsRect.LayoutOrder = 4
-	local statsLayout = Instance.new("UIListLayout", StatsRect); statsLayout.Padding = UDim.new(0, 6); statsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local InfoTextContainer = Instance.new("Frame", ShowcaseCard)
+	InfoTextContainer.Size = UDim2.new(1, -20, 0, 0); InfoTextContainer.AutomaticSize = Enum.AutomaticSize.Y; InfoTextContainer.BackgroundTransparency = 1; InfoTextContainer.LayoutOrder = 4
+	local itLayout = Instance.new("UIListLayout", InfoTextContainer); itLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; itLayout.Padding = UDim.new(0, 4)
 
-	local function CreateInfoLabel(parent)
-		local l = Instance.new("TextLabel", parent); l.Size = UDim2.new(1, 0, 0, 35); l.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-		l.Font = Enum.Font.GothamBold; l.TextColor3 = Color3.fromRGB(200, 200, 200); l.TextSize = 12; l.TextXAlignment = Enum.TextXAlignment.Left; l.TextWrapped = true
-		local pad = Instance.new("UIPadding", l); pad.PaddingLeft = UDim.new(0, 10); Instance.new("UICorner", l).CornerRadius = UDim.new(0, 4)
-		Instance.new("UIStroke", l).Color = Color3.fromRGB(60, 60, 70)
+	local function CreateStyledInfoLabel(parent)
+		local l = Instance.new("TextLabel", parent); l.Size = UDim2.new(1, 0, 0, 18); l.BackgroundTransparency = 1; l.Font = Enum.Font.GothamBold; l.TextColor3 = Color3.fromRGB(180, 180, 190); l.TextSize = 14; l.RichText = true
 		return l
 	end
 
-	local titanRow = Instance.new("Frame", StatsRect); titanRow.Size = UDim2.new(1, 0, 0, 35); titanRow.BackgroundTransparency = 1
+	prestigeValLbl = CreateStyledInfoLabel(InfoTextContainer)
+	eloValLbl = CreateStyledInfoLabel(InfoTextContainer)
+	regimentValLbl = CreateStyledInfoLabel(InfoTextContainer)
+
+	regIcon = Instance.new("ImageLabel", ShowcaseCard)
+	regIcon.Size = UDim2.new(0, 75, 0, 75); regIcon.BackgroundTransparency = 1; regIcon.ZIndex = 6; regIcon.LayoutOrder = 5
+
+	-- ==========================================
+	-- [[ 2. MIDDLE COLUMN (RADAR & STATS) ]]
+	-- ==========================================
+	local MidCol = Instance.new("Frame", MainFrame)
+	MidCol.Size = UDim2.new(0.95, 0, 0, 420); MidCol.BackgroundColor3 = Color3.fromRGB(20, 20, 25); MidCol.LayoutOrder = 2
+	Instance.new("UICorner", MidCol).CornerRadius = UDim.new(0, 12); Instance.new("UIStroke", MidCol).Color = Color3.fromRGB(80, 80, 90)
+
+	local midLayout = Instance.new("UIListLayout", MidCol); midLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; midLayout.SortOrder = Enum.SortOrder.LayoutOrder; midLayout.Padding = UDim.new(0, 10)
+	local midPad = Instance.new("UIPadding", MidCol); midPad.PaddingTop = UDim.new(0, 15); midPad.PaddingBottom = UDim.new(0, 15)
+
+	local RadarBG = Instance.new("Frame", MidCol)
+	RadarBG.Size = UDim2.new(0.95, 0, 0, 200); RadarBG.BackgroundColor3 = Color3.fromRGB(15, 15, 20); RadarBG.LayoutOrder = 1
+	Instance.new("UICorner", RadarBG).CornerRadius = UDim.new(0, 8); Instance.new("UIStroke", RadarBG).Color = Color3.fromRGB(60, 60, 70)
+
+	RadarContainer = Instance.new("Frame", RadarBG)
+	RadarContainer.Size = UDim2.new(1, 0, 1, 0); RadarContainer.Position = UDim2.new(0.5, 0, 0.5, 0); RadarContainer.AnchorPoint = Vector2.new(0.5, 0.5); RadarContainer.BackgroundTransparency = 1
+	Instance.new("UIAspectRatioConstraint", RadarContainer).AspectRatio = 1
+
+	local StatsRect = Instance.new("Frame", MidCol)
+	StatsRect.Size = UDim2.new(0.95, 0, 0, 0); StatsRect.AutomaticSize = Enum.AutomaticSize.Y; StatsRect.BackgroundColor3 = Color3.fromRGB(15, 15, 20); StatsRect.LayoutOrder = 2
+	Instance.new("UICorner", StatsRect).CornerRadius = UDim.new(0, 8); Instance.new("UIStroke", StatsRect).Color = Color3.fromRGB(60, 60, 70)
+	local srLayout = Instance.new("UIListLayout", StatsRect); srLayout.Padding = UDim.new(0, 0); srLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	local srPad = Instance.new("UIPadding", StatsRect); srPad.PaddingTop = UDim.new(0, 10); srPad.PaddingBottom = UDim.new(0, 10)
+
+	local function CreateInfoLabel(parent)
+		local l = Instance.new("TextLabel", parent); l.Size = UDim2.new(1, 0, 0, 36); l.BackgroundTransparency = 1
+		l.Font = Enum.Font.GothamBold; l.TextColor3 = Color3.fromRGB(200, 200, 200); l.TextSize = 12; l.TextXAlignment = Enum.TextXAlignment.Left; l.TextWrapped = true
+		local pad = Instance.new("UIPadding", l); pad.PaddingLeft = UDim.new(0, 15)
+		return l
+	end
+
+	local titanRow = Instance.new("Frame", StatsRect); titanRow.Size = UDim2.new(1, 0, 0, 36); titanRow.BackgroundTransparency = 1
 	titanLabel = CreateInfoLabel(titanRow); titanLabel.Size = UDim2.new(1, 0, 1, 0)
-	titanAwakenBtn = Instance.new("TextButton", titanRow); titanAwakenBtn.Size = UDim2.new(0.3, 0, 0.8, 0); titanAwakenBtn.Position = UDim2.new(0.68, 0, 0.1, 0)
+	titanAwakenBtn = Instance.new("TextButton", titanRow); titanAwakenBtn.Size = UDim2.new(0.28, 0, 0.8, 0); titanAwakenBtn.Position = UDim2.new(0.68, 0, 0.1, 0)
 	titanAwakenBtn.Font = Enum.Font.GothamBold; titanAwakenBtn.TextColor3 = Color3.fromRGB(255, 255, 255); titanAwakenBtn.TextSize = 10; titanAwakenBtn.Text = "AWAKEN"
 	ApplyButtonGradient(titanAwakenBtn, Color3.fromRGB(200, 60, 60), Color3.fromRGB(120, 30, 30), Color3.fromRGB(80, 20, 20)); titanAwakenBtn.Visible = false
 
 	regimentLabel = CreateInfoLabel(StatsRect)
 
-	local clanRow = Instance.new("Frame", StatsRect); clanRow.Size = UDim2.new(1, 0, 0, 35); clanRow.BackgroundTransparency = 1
+	local clanRow = Instance.new("Frame", StatsRect); clanRow.Size = UDim2.new(1, 0, 0, 36); clanRow.BackgroundTransparency = 1
 	clanLabel = CreateInfoLabel(clanRow); clanLabel.Size = UDim2.new(1, 0, 1, 0)
-	clanAwakenBtn = Instance.new("TextButton", clanRow); clanAwakenBtn.Size = UDim2.new(0.3, 0, 0.8, 0); clanAwakenBtn.Position = UDim2.new(0.68, 0, 0.1, 0)
+	clanAwakenBtn = Instance.new("TextButton", clanRow); clanAwakenBtn.Size = UDim2.new(0.28, 0, 0.8, 0); clanAwakenBtn.Position = UDim2.new(0.68, 0, 0.1, 0)
 	clanAwakenBtn.Font = Enum.Font.GothamBold; clanAwakenBtn.TextColor3 = Color3.fromRGB(255, 255, 255); clanAwakenBtn.TextSize = 10; clanAwakenBtn.Text = "AWAKEN"
 	ApplyButtonGradient(clanAwakenBtn, Color3.fromRGB(200, 60, 60), Color3.fromRGB(120, 30, 30), Color3.fromRGB(80, 20, 20)); clanAwakenBtn.Visible = false
 
 	wpnLabel = CreateInfoLabel(StatsRect)
 	accLabel = CreateInfoLabel(StatsRect)
 
-	prestigeBtn = Instance.new("TextButton", TopPanel)
-	prestigeBtn.Size = UDim2.new(0.9, 0, 0, 35); prestigeBtn.LayoutOrder = 5
-	prestigeBtn.Font = Enum.Font.GothamBlack; prestigeBtn.TextColor3 = Color3.fromRGB(255, 255, 255); prestigeBtn.TextSize = 12; prestigeBtn.Text = "PRESTIGE (RESET CAMPAIGN)"
+	local ActionRow = Instance.new("Frame", MidCol)
+	ActionRow.Size = UDim2.new(0.95, 0, 0, 40); ActionRow.BackgroundTransparency = 1; ActionRow.LayoutOrder = 3
+	local arLayout = Instance.new("UIListLayout", ActionRow); arLayout.FillDirection = Enum.FillDirection.Horizontal; arLayout.Padding = UDim.new(0.02, 0)
+
+	prestigeBtn = Instance.new("TextButton", ActionRow)
+	prestigeBtn.Size = UDim2.new(0.49, 0, 1, 0); prestigeBtn.LayoutOrder = 1
+	prestigeBtn.Font = Enum.Font.GothamBlack; prestigeBtn.TextColor3 = Color3.fromRGB(255, 255, 255); prestigeBtn.TextSize = 12; prestigeBtn.Text = "PRESTIGE"
 	ApplyButtonGradient(prestigeBtn, Color3.fromRGB(220, 180, 50), Color3.fromRGB(140, 100, 20), Color3.fromRGB(255, 215, 100)); prestigeBtn.Visible = false
 
-	toggleStatsBtn = Instance.new("TextButton", TopPanel)
-	toggleStatsBtn.Size = UDim2.new(0.9, 0, 0, 35); toggleStatsBtn.LayoutOrder = 6
+	toggleStatsBtn = Instance.new("TextButton", ActionRow)
+	toggleStatsBtn.Size = UDim2.new(1, 0, 1, 0); toggleStatsBtn.LayoutOrder = 2
 	toggleStatsBtn.Font = Enum.Font.GothamBold; toggleStatsBtn.TextColor3 = Color3.fromRGB(200, 200, 255); toggleStatsBtn.TextSize = 12; toggleStatsBtn.Text = "VIEW TITAN STATS"
 	ApplyButtonGradient(toggleStatsBtn, Color3.fromRGB(60, 60, 80), Color3.fromRGB(30, 30, 40), Color3.fromRGB(100, 100, 150))
 
-	topLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() TopPanel.Size = UDim2.new(0.95, 0, 0, topLayout.AbsoluteContentSize.Y + 30) end)
+	prestigeBtn:GetPropertyChangedSignal("Visible"):Connect(function()
+		if prestigeBtn.Visible then toggleStatsBtn.Size = UDim2.new(0.49, 0, 1, 0) else toggleStatsBtn.Size = UDim2.new(1, 0, 1, 0) end
+	end)
 
-	local BottomPanel = Instance.new("Frame", MainFrame)
-	BottomPanel.Size = UDim2.new(0.95, 0, 0, 500); BottomPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 25); BottomPanel.LayoutOrder = 2
-	Instance.new("UICorner", BottomPanel).CornerRadius = UDim.new(0, 8); Instance.new("UIStroke", BottomPanel).Color = Color3.fromRGB(80, 80, 90)
+	midLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() MidCol.Size = UDim2.new(0.95, 0, 0, midLayout.AbsoluteContentSize.Y + 30) end)
 
-	InvTitle = Instance.new("TextLabel", BottomPanel)
+
+	-- ==========================================
+	-- [[ 3. SUB-NAVIGATION TABS (INVENTORY & COSMETICS) ]]
+	-- ==========================================
+	local TopNav = Instance.new("ScrollingFrame", MainFrame)
+	TopNav.Size = UDim2.new(0.95, 0, 0, 40); TopNav.BackgroundColor3 = Color3.fromRGB(15, 15, 18); TopNav.ScrollBarThickness = 0; TopNav.ScrollingDirection = Enum.ScrollingDirection.X; TopNav.LayoutOrder = 3
+	Instance.new("UICorner", TopNav).CornerRadius = UDim.new(0, 8); Instance.new("UIStroke", TopNav).Color = Color3.fromRGB(80, 80, 90)
+	local navLayout = Instance.new("UIListLayout", TopNav); navLayout.FillDirection = Enum.FillDirection.Horizontal; navLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left; navLayout.VerticalAlignment = Enum.VerticalAlignment.Center; navLayout.Padding = UDim.new(0, 10)
+	local navPad = Instance.new("UIPadding", TopNav); navPad.PaddingLeft = UDim.new(0, 10); navPad.PaddingRight = UDim.new(0, 10)
+
+	navLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() TopNav.CanvasSize = UDim2.new(0, navLayout.AbsoluteContentSize.X + 20, 0, 0) end)
+
+	ContentArea = Instance.new("Frame", MainFrame)
+	ContentArea.Size = UDim2.new(0.95, 0, 0, 0); ContentArea.AutomaticSize = Enum.AutomaticSize.Y; ContentArea.BackgroundTransparency = 1; ContentArea.LayoutOrder = 4
+
+	local function CreateSubNavBtn(name, text)
+		local btn = Instance.new("TextButton", TopNav)
+		btn.Size = UDim2.new(0, 110, 0, 28); btn.Font = Enum.Font.GothamBold; btn.TextColor3 = Color3.fromRGB(180, 180, 180); btn.TextSize = 11; btn.Text = text
+		ApplyButtonGradient(btn, Color3.fromRGB(50, 50, 55), Color3.fromRGB(25, 25, 30), Color3.fromRGB(60, 60, 65))
+
+		btn.MouseButton1Click:Connect(function()
+			for k, v in pairs(SubBtns) do 
+				local cGrad = v:FindFirstChildOfClass("UIGradient")
+				if cGrad then TweenGradient(cGrad, Color3.fromRGB(50, 50, 55), Color3.fromRGB(25, 25, 30), 0.2) end
+				TweenService:Create(v, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(180, 180, 180)}):Play() 
+			end
+			local grad = btn:FindFirstChildOfClass("UIGradient")
+			if grad then TweenGradient(grad, Color3.fromRGB(200, 150, 40), Color3.fromRGB(120, 80, 15), 0.2) end
+			TweenService:Create(btn, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+
+			for k, frame in pairs(SubTabs) do frame.Visible = (k == name) end
+		end)
+		SubBtns[name] = btn
+		return btn
+	end
+
+	CreateSubNavBtn("Inventory", "INVENTORY")
+	CreateSubNavBtn("Titles", "TITLES")
+	CreateSubNavBtn("Auras", "AURAS")
+
+	-- [[ 3A. INVENTORY TAB ]]
+	SubTabs["Inventory"] = Instance.new("Frame", ContentArea)
+	SubTabs["Inventory"].Size = UDim2.new(1, 0, 1, 0); SubTabs["Inventory"].BackgroundColor3 = Color3.fromRGB(20, 20, 25); SubTabs["Inventory"].Visible = true
+	Instance.new("UICorner", SubTabs["Inventory"]).CornerRadius = UDim.new(0, 8); Instance.new("UIStroke", SubTabs["Inventory"]).Color = Color3.fromRGB(80, 80, 90)
+
+	InvTitle = Instance.new("TextLabel", SubTabs["Inventory"])
 	InvTitle.Size = UDim2.new(1, 0, 0, 40); InvTitle.BackgroundTransparency = 1; InvTitle.Font = Enum.Font.GothamBlack; InvTitle.TextColor3 = Color3.fromRGB(255, 215, 100); InvTitle.TextSize = 18; InvTitle.Text = "INVENTORY (0/50)"
 	ApplyGradient(InvTitle, Color3.fromRGB(255, 215, 100), Color3.fromRGB(255, 150, 50))
 
-	local AutoSellFrame = Instance.new("Frame", BottomPanel)
+	local AutoSellFrame = Instance.new("Frame", SubTabs["Inventory"])
 	AutoSellFrame.Size = UDim2.new(1, 0, 0, 30); AutoSellFrame.Position = UDim2.new(0, 0, 0, 40); AutoSellFrame.BackgroundTransparency = 1
 	local asLayout = Instance.new("UIListLayout", AutoSellFrame); asLayout.FillDirection = Enum.FillDirection.Horizontal; asLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; asLayout.Padding = UDim.new(0, 5)
 
@@ -211,8 +275,7 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 	local autoSellStates = {Common = false, Uncommon = false, Rare = false}
 	local function CreateAutoSell(rarity, color)
 		local asBtn = Instance.new("TextButton", AutoSellFrame)
-		asBtn.Size = UDim2.new(0, 75, 1, 0)
-		asBtn.Font = Enum.Font.GothamBold; asBtn.TextColor3 = color; asBtn.TextSize = 11; asBtn.Text = "All " .. rarity
+		asBtn.Size = UDim2.new(0, 75, 1, 0); asBtn.Font = Enum.Font.GothamBold; asBtn.TextColor3 = color; asBtn.TextSize = 11; asBtn.Text = "All " .. rarity
 		ApplyButtonGradient(asBtn, Color3.fromRGB(50, 50, 55), Color3.fromRGB(25, 25, 30), Color3.fromRGB(60, 60, 70))
 
 		asBtn.MouseButton1Click:Connect(function()
@@ -231,19 +294,83 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 	CreateAutoSell("Uncommon", Color3.fromRGB(100, 255, 100))
 	CreateAutoSell("Rare", Color3.fromRGB(100, 100, 255))
 
-	InvGrid = Instance.new("ScrollingFrame", BottomPanel)
+	InvGrid = Instance.new("ScrollingFrame", SubTabs["Inventory"])
 	InvGrid.Size = UDim2.new(1, -10, 1, -90); InvGrid.Position = UDim2.new(0, 5, 0, 80); InvGrid.BackgroundTransparency = 1; InvGrid.BorderSizePixel = 0; InvGrid.ScrollBarThickness = 4
 	local gl = Instance.new("UIGridLayout", InvGrid)
-	gl.CellSize = UDim2.new(0, 75, 0, 75) 
-	gl.CellPadding = UDim2.new(0, 8, 0, 10)
-	gl.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	gl.SortOrder = Enum.SortOrder.LayoutOrder
+	gl.CellSize = UDim2.new(0, 75, 0, 75); gl.CellPadding = UDim2.new(0, 10, 0, 15); gl.HorizontalAlignment = Enum.HorizontalAlignment.Center; gl.SortOrder = Enum.SortOrder.LayoutOrder
 
+	-- [[ 3B. TITLES TAB ]]
+	SubTabs["Titles"] = Instance.new("ScrollingFrame", ContentArea)
+	SubTabs["Titles"].Size = UDim2.new(1, 0, 1, 0); SubTabs["Titles"].BackgroundTransparency = 1; SubTabs["Titles"].Visible = false; SubTabs["Titles"].ScrollBarThickness = 6; SubTabs["Titles"].BorderSizePixel = 0
+	local tLayout = Instance.new("UIListLayout", SubTabs["Titles"]); tLayout.Padding = UDim.new(0, 10); tLayout.SortOrder = Enum.SortOrder.LayoutOrder; tLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local tPad = Instance.new("UIPadding", SubTabs["Titles"]); tPad.PaddingTop = UDim.new(0, 10); tPad.PaddingBottom = UDim.new(0, 20)
+
+	-- [[ 3C. AURAS TAB ]]
+	SubTabs["Auras"] = Instance.new("ScrollingFrame", ContentArea)
+	SubTabs["Auras"].Size = UDim2.new(1, 0, 1, 0); SubTabs["Auras"].BackgroundTransparency = 1; SubTabs["Auras"].Visible = false; SubTabs["Auras"].ScrollBarThickness = 6; SubTabs["Auras"].BorderSizePixel = 0
+	local aLayout = Instance.new("UIListLayout", SubTabs["Auras"]); aLayout.Padding = UDim.new(0, 10); aLayout.SortOrder = Enum.SortOrder.LayoutOrder; aLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local aPad = Instance.new("UIPadding", SubTabs["Auras"]); aPad.PaddingTop = UDim.new(0, 10); aPad.PaddingBottom = UDim.new(0, 20)
+
+	local function BuildCosmeticList(tab, typeKey, dataPool)
+		local sorted = {}
+		for key, data in pairs(dataPool) do table.insert(sorted, {Key = key, Data = data}) end
+		table.sort(sorted, function(a, b) return a.Data.Order < b.Data.Order end)
+
+		for _, item in ipairs(sorted) do
+			local card = Instance.new("Frame", tab)
+			card.Size = UDim2.new(0.95, 0, 0, 80); card.BackgroundColor3 = Color3.fromRGB(22, 22, 28); card.LayoutOrder = item.Data.Order
+			Instance.new("UICorner", card).CornerRadius = UDim.new(0, 6)
+			local stroke = Instance.new("UIStroke", card); stroke.Color = Color3.fromRGB(60, 60, 70); stroke.Thickness = 1
+
+			local cColor = Color3.fromRGB(255,255,255)
+			if typeKey == "Title" then cColor = Color3.fromHex((item.Data.Color or "#FFFFFF"):gsub("#", "")) else cColor = Color3.fromHex((item.Data.Color1 or "#FFFFFF"):gsub("#", "")) end
+
+			local title = Instance.new("TextLabel", card); title.Size = UDim2.new(0.65, 0, 0, 25); title.Position = UDim2.new(0, 15, 0, 10); title.BackgroundTransparency = 1; title.Font = Enum.Font.GothamBlack; title.TextColor3 = cColor; title.TextSize = 16; title.TextXAlignment = Enum.TextXAlignment.Left; title.Text = item.Data.Name
+			local desc = Instance.new("TextLabel", card); desc.Size = UDim2.new(0.65, 0, 0, 30); desc.Position = UDim2.new(0, 15, 0, 35); desc.BackgroundTransparency = 1; desc.Font = Enum.Font.GothamMedium; desc.TextColor3 = Color3.fromRGB(150, 150, 160); desc.TextSize = 13; desc.TextWrapped = true; desc.TextXAlignment = Enum.TextXAlignment.Left; desc.TextYAlignment = Enum.TextYAlignment.Top; desc.Text = item.Data.Desc
+
+			local btn = Instance.new("TextButton", card)
+			btn.Size = UDim2.new(0.25, 0, 0, 40); btn.AnchorPoint = Vector2.new(1, 0.5); btn.Position = UDim2.new(1, -15, 0.5, 0); btn.Font = Enum.Font.GothamBlack; btn.TextSize = 13; btn.Text = ""
+
+			local function UpdateState()
+				local isUnlocked = CosmeticData.CheckUnlock(player, item.Data.ReqType, item.Data.ReqValue)
+				local isEquipped = (player:GetAttribute("Equipped" .. typeKey) or (typeKey == "Title" and "Cadet" or "None")) == item.Key
+
+				if isEquipped then
+					btn.Text = "EQUIPPED"; ApplyButtonGradient(btn, Color3.fromRGB(40, 40, 45), Color3.fromRGB(20, 20, 25), Color3.fromRGB(60, 60, 70)); btn.TextColor3 = Color3.fromRGB(150, 150, 150)
+					stroke.Color = cColor; stroke.Thickness = 2; stroke.Transparency = 0.2
+				elseif isUnlocked then
+					btn.Text = "EQUIP"; ApplyButtonGradient(btn, Color3.fromRGB(40, 100, 40), Color3.fromRGB(20, 50, 20), Color3.fromRGB(60, 150, 60)); btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+					stroke.Color = Color3.fromRGB(80, 80, 90); stroke.Thickness = 1; stroke.Transparency = 0
+				else
+					btn.Text = "LOCKED"; ApplyButtonGradient(btn, Color3.fromRGB(60, 20, 20), Color3.fromRGB(30, 10, 10), Color3.fromRGB(100, 30, 30)); btn.TextColor3 = Color3.fromRGB(150, 150, 150)
+					stroke.Color = Color3.fromRGB(60, 60, 70); stroke.Thickness = 1; stroke.Transparency = 0
+				end
+			end
+
+			btn.MouseButton1Click:Connect(function()
+				if CosmeticData.CheckUnlock(player, item.Data.ReqType, item.Data.ReqValue) then Network.EquipCosmetic:FireServer(typeKey, item.Key) end
+			end)
+			player.AttributeChanged:Connect(function(attr)
+				if attr == "Equipped"..typeKey or attr == "Prestige" or attr == "Elo" or string.match(attr, "^Ach_") or attr == "Titan" then UpdateState() end
+			end)
+			UpdateState()
+		end
+	end
+
+	BuildCosmeticList(SubTabs["Titles"], "Title", CosmeticData.Titles)
+	tLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() SubTabs["Titles"].CanvasSize = UDim2.new(0, 0, 0, tLayout.AbsoluteContentSize.Y + 30) end)
+
+	BuildCosmeticList(SubTabs["Auras"], "Aura", CosmeticData.Auras)
+	aLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() SubTabs["Auras"].CanvasSize = UDim2.new(0, 0, 0, aLayout.AbsoluteContentSize.Y + 30) end)
+
+
+	-- [[ GLOBAL UPDATE LOGIC ]]
 	titanAwakenBtn.MouseButton1Click:Connect(function() Network.AwakenAction:FireServer("Titan") end)
 	clanAwakenBtn.MouseButton1Click:Connect(function() Network.AwakenAction:FireServer("Clan") end)
 	prestigeBtn.MouseButton1Click:Connect(function() Network.PrestigeEvent:FireServer() end)
 
 	local function RenderRadarChart()
+		if not RadarContainer or RadarContainer.Parent == nil then return end
 		local w = RadarContainer.AbsoluteSize.X; local h = RadarContainer.AbsoluteSize.Y
 		if w == 0 then return end 
 		for _, child in ipairs(RadarContainer:GetChildren()) do if not child:IsA("UIAspectRatioConstraint") then child:Destroy() end end
@@ -269,9 +396,14 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 	local function RefreshProfile()
 		local tName = player:GetAttribute("Titan") or "None"; local cName = player:GetAttribute("Clan") or "None"; local cPart = player:GetAttribute("CurrentPart") or 1
 		local regName = player:GetAttribute("Regiment") or "Cadet Corps"
+
+		-- [[ DYNAMIC TEXT STYLING ]]
 		local hasRegData, regDataModule = pcall(function() return require(game.ReplicatedStorage:WaitForChild("RegimentData")) end)
+		local regTextColorHex = REG_COLORS[regName] or TEXT_COLORS.DefaultGreen
 		if hasRegData and regDataModule and regDataModule.Regiments[regName] then 
 			regIcon.Image = regDataModule.Regiments[regName].Icon 
+		else
+			regIcon.Image = "" 
 		end
 
 		if cName == "Ackerman" or cName == "Awakened Ackerman" then titanLabel.Text = "Titan: <font color='#FF5555'>(Titan Disabled)</font>" else titanLabel.Text = "Titan: <font color='#FF5555'>" .. tName .. "</font>" end
@@ -281,13 +413,33 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 
 		if tName == "Attack Titan" and (player:GetAttribute("YmirsClayFragmentCount") or 0) > 0 then titanAwakenBtn.Visible = true else titanAwakenBtn.Visible = false end
 
-		-- Check all valid clans for awakening button
 		local validClans = {["Ackerman"] = true, ["Yeager"] = true, ["Tybur"] = true, ["Braun"] = true, ["Galliard"] = true}
 		if validClans[cName] and (player:GetAttribute("AncestralAwakeningSerumCount") or 0) > 0 then clanAwakenBtn.Visible = true else clanAwakenBtn.Visible = false end
 
 		if cPart > 8 then prestigeBtn.Visible = true else prestigeBtn.Visible = false end
 
 		RenderRadarChart()
+
+		-- [[ RUN 2D PARTICLE AURA ]]
+		local pTitle = player:GetAttribute("EquippedTitle") or "Cadet"
+		local pAura = player:GetAttribute("EquippedAura") or "None"
+
+		local tData = CosmeticData.Titles[pTitle]
+		if tData then AvatarTitle.Text = string.upper(tData.Name); AvatarTitle.TextColor3 = Color3.fromHex((tData.Color or "#FFFFFF"):gsub("#", "")) end
+
+		local aData = CosmeticData.Auras[pAura]
+		if UIAuraManager then
+			UIAuraManager.ApplyAura(AvatarAuraGlow, aData)
+		end
+
+		local ls = player:FindFirstChild("leaderstats")
+		local pres = (ls and ls:FindFirstChild("Prestige")) and ls.Prestige.Value or 0
+		local elo = (ls and ls:FindFirstChild("Elo")) and ls.Elo.Value or 1000
+
+		-- [[ APPLY RICH TEXT TO NEW LABELS ]]
+		prestigeValLbl.Text = "Prestige: <font color='"..TEXT_COLORS.PrestigeYellow.."'>"..pres.."</font>"
+		eloValLbl.Text = "Elo: <font color='"..TEXT_COLORS.EloBlue.."'>"..elo.."</font>"
+		regimentValLbl.Text = "Regiment: <font color='"..regTextColorHex.."'>"..regName.."</font>"
 
 		for _, child in ipairs(InvGrid:GetChildren()) do 
 			if child.Name == "ItemCard" then child:Destroy() end 
@@ -349,20 +501,20 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 				bgGlow.ZIndex = 1
 
 				local countBadge = Instance.new("Frame", card)
-				countBadge.Size = UDim2.new(0, 20, 0, 12)
+				countBadge.Size = UDim2.new(0, 24, 0, 14)
 				countBadge.AnchorPoint = Vector2.new(1, 0)
-				countBadge.Position = UDim2.new(1, -3, 0, 6)
+				countBadge.Position = UDim2.new(1, -4, 0, 8)
 				countBadge.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
 				countBadge.BorderSizePixel = 0
 				countBadge.ZIndex = 3
-				Instance.new("UICorner", countBadge).CornerRadius = UDim.new(0, 3)
+				Instance.new("UICorner", countBadge).CornerRadius = UDim.new(0, 4)
 
 				local countTag = Instance.new("TextLabel", countBadge)
 				countTag.Size = UDim2.new(1, 0, 1, 0)
 				countTag.BackgroundTransparency = 1
 				countTag.Font = Enum.Font.GothamBlack
 				countTag.TextColor3 = Color3.fromRGB(210, 210, 210)
-				countTag.TextSize = 8
+				countTag.TextSize = 10
 				countTag.Text = "x" .. count
 				countTag.ZIndex = 4
 
@@ -378,17 +530,17 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 				nameLbl.Text = itemName
 				nameLbl.ZIndex = 3
 				local tConstraint = Instance.new("UITextSizeConstraint", nameLbl)
-				tConstraint.MaxTextSize = 10
-				tConstraint.MinTextSize = 6
+				tConstraint.MaxTextSize = 11
+				tConstraint.MinTextSize = 7
 
 				local rarityTag = Instance.new("TextLabel", card)
-				rarityTag.Size = UDim2.new(0, 14, 0, 14)
-				rarityTag.Position = UDim2.new(0, 4, 1, -18)
+				rarityTag.Size = UDim2.new(0, 16, 0, 16)
+				rarityTag.Position = UDim2.new(0, 6, 1, -22)
 				rarityTag.BackgroundTransparency = 1
 				rarityTag.Font = Enum.Font.GothamBlack
 				rarityTag.TextColor3 = rarityRGB
 				rarityTag.TextTransparency = 0.3
-				rarityTag.TextSize = 9
+				rarityTag.TextSize = 11
 				rarityTag.Text = string.sub(rarityKey, 1, 1)
 				rarityTag.ZIndex = 3
 
@@ -401,7 +553,7 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 					local wrapped = ""
 					local lineLen = 0
 					for word in desc:gmatch("%S+") do
-						if lineLen + #word + 1 > 28 and lineLen > 0 then
+						if lineLen + #word + 1 > 35 and lineLen > 0 then
 							wrapped = wrapped .. "\n" .. word
 							lineLen = #word
 						else
@@ -429,7 +581,7 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 					giftTag.Font = Enum.Font.GothamBold
 					giftTag.TextColor3 = Color3.fromRGB(255, 210, 80)
 					giftTag.TextTransparency = 0.2
-					giftTag.TextSize = 8
+					giftTag.TextSize = 10
 					giftTag.Text = "GIFT"
 					giftTag.ZIndex = 3
 				else
@@ -444,18 +596,18 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 					Instance.new("UICorner", ActionsOverlay).CornerRadius = UDim.new(0, 6)
 
 					local actLayout = Instance.new("UIListLayout", ActionsOverlay)
-					actLayout.Padding = UDim.new(0, 3)
+					actLayout.Padding = UDim.new(0, 4)
 					actLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 					actLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
 					local buttonConsumed = false
 					local function MakeOverlayBtn(text, bgColor)
 						local btn = Instance.new("TextButton", ActionsOverlay)
-						btn.Size = UDim2.new(0.85, 0, 0, 18)
+						btn.Size = UDim2.new(0.85, 0, 0, 22)
 						btn.BackgroundColor3 = bgColor
 						btn.Font = Enum.Font.GothamBold
 						btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-						btn.TextSize = 8
+						btn.TextSize = 10
 						btn.Text = text
 						btn.ZIndex = 11 
 						Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
@@ -498,7 +650,6 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 								buttonConsumed = true
 								if itemInfo.Action == "AwakenTitan" then Network.AwakenAction:FireServer("Titan") 
 								elseif itemInfo.Action == "AwakenClan" then Network.AwakenAction:FireServer("Clan") 
-									-- [[ THE FIX: Updated to natively fire the Consume action for Itemized Titans ]]
 								elseif itemInfo.Action == "Consume" or itemInfo.Action == "EquipTitan" then Network.ConsumeItem:FireServer(itemName)
 								end 
 								ActionsOverlay.Visible = false
@@ -548,10 +699,18 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 		InvTitle.Text = "INVENTORY (" .. currentSlotsUsed .. "/" .. MAX_INVENTORY_CAPACITY .. ")"
 		if currentSlotsUsed >= MAX_INVENTORY_CAPACITY then InvTitle.TextColor3 = Color3.fromRGB(255, 100, 100) else InvTitle.TextColor3 = Color3.fromRGB(255, 215, 100) end
 
-		task.delay(0.05, function() InvGrid.CanvasSize = UDim2.new(0, 0, 0, math.ceil(layoutOrderCounter / 4) * 85) end)
-		task.delay(0.05, function() MainFrame.CanvasSize = UDim2.new(0, 0, 0, mLayout.AbsoluteContentSize.Y + 40) end)
+		task.delay(0.05, function() InvGrid.CanvasSize = UDim2.new(0, 0, 0, math.ceil(layoutOrderCounter / 6) * 95) end)
+		task.delay(0.05, function() TabsWrapper.Size = UDim2.new(0.35, 0, 1, 0) end)
 	end
-	player.AttributeChanged:Connect(RefreshProfile); RefreshProfile()
+
+	player.AttributeChanged:Connect(RefreshProfile)
+
+	task.spawn(function()
+		RefreshProfile()
+		local cGrad = SubBtns["Inventory"]:FindFirstChildOfClass("UIGradient")
+		if cGrad then TweenGradient(cGrad, Color3.fromRGB(200, 150, 40), Color3.fromRGB(120, 80, 15), 0) end
+		TweenService:Create(SubBtns["Inventory"], TweenInfo.new(0), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+	end)
 end
 
 function ProfileTab.Show() if MainFrame then MainFrame.Visible = true end end
