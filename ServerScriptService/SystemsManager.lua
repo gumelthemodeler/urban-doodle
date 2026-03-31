@@ -99,21 +99,51 @@ Network:WaitForChild("ConsumeItem").OnServerEvent:Connect(function(player, itemN
 end)
 
 -- [[ FORGE & AWAKENING ]]
-Network:WaitForChild("ForgeItem").OnServerEvent:Connect(function(player, reqItem)
-	local recipe = ItemData.ForgeRecipes[reqItem]
-	if recipe then
-		local safeReq = reqItem:gsub("[^%w]", "") .. "Count"
-		local count = player:GetAttribute(safeReq) or 0
-		local dews = player.leaderstats.Dews.Value
+-- [[ FORGE & AWAKENING ]]
+Network:WaitForChild("ForgeItem").OnServerEvent:Connect(function(player, recipeName)
+	local recipe = ItemData.ForgeRecipes[recipeName]
+	if not recipe then return end
 
-		if count >= recipe.ReqAmt and dews >= recipe.DewCost then
-			player:SetAttribute(safeReq, count - recipe.ReqAmt)
-			player.leaderstats.Dews.Value -= recipe.DewCost
+	local dews = player.leaderstats.Dews.Value
+	if dews < recipe.DewCost then
+		NotificationEvent:FireClient(player, "Not enough Dews to forge this!", "Error")
+		return
+	end
 
-			local resSafeName = recipe.Result:gsub("[^%w]", "") .. "Count"
-			player:SetAttribute(resSafeName, (player:GetAttribute(resSafeName) or 0) + 1)
-			NotificationEvent:FireClient(player, "Forged " .. recipe.Result .. "!", "Success")
+	-- 1. Check if they have ALL required items
+	local canForge = true
+	for reqItemName, reqAmt in pairs(recipe.ReqItems) do
+		local safeReq = reqItemName:gsub("[^%w]", "") .. "Count"
+		local currentCount = player:GetAttribute(safeReq) or 0
+		if currentCount < reqAmt then
+			canForge = false
+			break
 		end
+	end
+
+	if not canForge then
+		NotificationEvent:FireClient(player, "Missing required materials!", "Error")
+		return
+	end
+
+	-- 2. Deduct the materials & Dews
+	player.leaderstats.Dews.Value -= recipe.DewCost
+	for reqItemName, reqAmt in pairs(recipe.ReqItems) do
+		local safeReq = reqItemName:gsub("[^%w]", "") .. "Count"
+		local currentCount = player:GetAttribute(safeReq) or 0
+		player:SetAttribute(safeReq, currentCount - reqAmt)
+	end
+
+	-- 3. Grant the result
+	local resSafeName = recipe.Result:gsub("[^%w]", "") .. "Count"
+	player:SetAttribute(resSafeName, (player:GetAttribute(resSafeName) or 0) + 1)
+
+	-- Broadcast to server if it's a transcendent craft!
+	local resData = ItemData.Equipment[recipe.Result] or ItemData.Consumables[recipe.Result]
+	if resData and resData.Rarity == "Transcendent" then
+		NotificationEvent:FireAllClients("<font color='#FF55FF'><b>" .. player.Name .. " has forged the " .. recipe.Result .. "!</b></font>", "Success")
+	else
+		NotificationEvent:FireClient(player, "Forged " .. recipe.Result .. "!", "Success")
 	end
 end)
 
@@ -353,6 +383,44 @@ Network:WaitForChild("UpgradeStat").OnServerEvent:Connect(function(player, statN
 	end
 end)
 
+-- [[ PRESTIGE & SKILL TREE ]]
+local UnlockPrestigeNode = Network:FindFirstChild("UnlockPrestigeNode") or Instance.new("RemoteEvent", Network)
+UnlockPrestigeNode.Name = "UnlockPrestigeNode"
+
+UnlockPrestigeNode.OnServerEvent:Connect(function(player, nodeId)
+	local node = GameData.PrestigeNodes[nodeId]
+	if not node then return end
+
+	if player:GetAttribute("PrestigeNode_" .. nodeId) then
+		NotificationEvent:FireClient(player, "You already own this talent!", "Error")
+		return
+	end
+
+	local points = player:GetAttribute("PrestigePoints") or 0
+	if points < node.Cost then
+		NotificationEvent:FireClient(player, "Not enough Prestige Points!", "Error")
+		return
+	end
+
+	if node.Req and not player:GetAttribute("PrestigeNode_" .. node.Req) then
+		NotificationEvent:FireClient(player, "You must unlock the previous node first!", "Error")
+		return
+	end
+
+	-- Deduct point, set node to unlocked
+	player:SetAttribute("PrestigePoints", points - node.Cost)
+	player:SetAttribute("PrestigeNode_" .. nodeId, true)
+
+	-- Automatically inject the static buffs into the player's attributes
+	if node.BuffType == "FlatStat" then
+		player:SetAttribute(node.BuffStat, (player:GetAttribute(node.BuffStat) or 10) + node.BuffValue)
+	elseif node.BuffType == "Special" then
+		player:SetAttribute("Prestige_" .. node.BuffStat, (player:GetAttribute("Prestige_" .. node.BuffStat) or 0) + node.BuffValue)
+	end
+
+	NotificationEvent:FireClient(player, "Unlocked " .. node.Name .. "!", "Success")
+end)
+
 Network:WaitForChild("PrestigeEvent").OnServerEvent:Connect(function(player)
 	local currentPart = player:GetAttribute("CurrentPart") or 1
 	if currentPart > 8 then
@@ -362,7 +430,11 @@ Network:WaitForChild("PrestigeEvent").OnServerEvent:Connect(function(player)
 		player:SetAttribute("CurrentPart", 1)
 		player:SetAttribute("CurrentWave", 1)
 		player:SetAttribute("PathsFloor", 1)
-		NotificationEvent:FireClient(player, "You have Prestiged! Campaign reset. Rewards & Difficulty Multiplied!", "Success")
+
+		-- [[ FIX: Award a Prestige Point to spend in the new Skill Tree ]]
+		player:SetAttribute("PrestigePoints", (player:GetAttribute("PrestigePoints") or 0) + 1)
+
+		NotificationEvent:FireClient(player, "You have Prestiged! +1 Prestige Point acquired!", "Success")
 	else
 		NotificationEvent:FireClient(player, "You must clear the Campaign (Part 8) before you can Prestige!", "Error")
 	end
