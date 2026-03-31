@@ -165,6 +165,11 @@ end)
 -- [[ TITAN FUSION & ITEMIZATION ]]
 Network:WaitForChild("FuseTitan").OnServerEvent:Connect(function(player, baseSlot, sacSlot)
 	if not baseSlot or not sacSlot or baseSlot == sacSlot then return end
+
+	-- [[ FIX: Verify slot names are valid strings to prevent arbitrary attribute injection ]]
+	local validSlots = {["Equipped"] = true, ["1"] = true, ["2"] = true, ["3"] = true, ["4"] = true, ["5"] = true, ["6"] = true}
+	if not validSlots[tostring(baseSlot)] or not validSlots[tostring(sacSlot)] then return end
+
 	local dews = player.leaderstats.Dews.Value
 	if dews >= 250000 then
 		local baseAttr = (baseSlot == "Equipped") and "Titan" or ("Titan_Slot" .. baseSlot)
@@ -213,6 +218,11 @@ end)
 
 -- [[ STORAGE MANAGEMENT ]]
 Network:WaitForChild("ManageStorage").OnServerEvent:Connect(function(player, gType, slotIndex)
+	-- [[ FIX: Verify slotIndex is an integer to prevent arbitrary attribute access! ]]
+	slotIndex = tonumber(slotIndex)
+	if not slotIndex or slotIndex < 1 or slotIndex > 6 then return end
+	if slotIndex > 3 and not player:GetAttribute("Has" .. gType .. "Vault") then return end
+
 	local currentAttr = (gType == "Titan") and "Titan" or "Clan"
 	local slotAttr = currentAttr .. "_Slot" .. slotIndex
 
@@ -284,11 +294,18 @@ Network:WaitForChild("GachaRoll").OnServerEvent:Connect(function(player, gType, 
 
 		player:SetAttribute(gType, resultName)
 		GachaResult:FireClient(player, gType, resultName, rarity)
+	else
+		-- [[ FIX: Return explicitly failed error code so client UI doesn't soft-lock ]]
+		GachaResult:FireClient(player, gType, "Error", "None")
 	end
 end)
 
 -- [[ TRAINING & STATS ]]
 Network:WaitForChild("TrainAction").OnServerEvent:Connect(function(player, combo, isTitan)
+	-- [[ FIX: Secure the Train Combo multiplier against exploiters sending massive integers ]]
+	combo = tonumber(combo) or 0
+	combo = math.clamp(combo, 0, 150)
+
 	local prestige = player.leaderstats and player.leaderstats:FindFirstChild("Prestige") and player.leaderstats.Prestige.Value or 0
 	local totalStats = (player:GetAttribute("Strength") or 10) + (player:GetAttribute("Defense") or 10) + (player:GetAttribute("Speed") or 10) + (player:GetAttribute("Resolve") or 10)
 
@@ -300,6 +317,17 @@ Network:WaitForChild("TrainAction").OnServerEvent:Connect(function(player, combo
 end)
 
 Network:WaitForChild("UpgradeStat").OnServerEvent:Connect(function(player, statName, amount)
+	-- [[ FIX: Added a strict whitelist to prevent arbitrary attribute injections like "Prestige" ]]
+	local validStats = {
+		["Strength"]=true, ["Defense"]=true, ["Speed"]=true, ["Resolve"]=true,
+		["Titan_Power_Val"]=true, ["Titan_Speed_Val"]=true, ["Titan_Hardening_Val"]=true, 
+		["Titan_Endurance_Val"]=true, ["Titan_Precision_Val"]=true, ["Titan_Potential_Val"]=true
+	}
+	if not validStats[statName] then return end
+
+	amount = tonumber(amount) or 1
+	amount = math.clamp(amount, 1, 100) -- Fix: Stop integer overflow / server crashing loops
+
 	local isTitanStat = string.match(statName, "Titan_.*_Val$")
 	local xpAttr = isTitanStat and "TitanXP" or "XP"
 
