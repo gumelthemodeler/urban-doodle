@@ -260,4 +260,32 @@ EnemyData.PathsMemories = {
 	{ Name = "Memory of the Colossal", Health = 25000, GateType="Steam", GateHP=6, Strength = 600, Defense = 100, Speed = 10, Resolve = 800, TitanStats = emptyTitans, Skills = {"Colossal Steam", "Stomp"}, Drops = {XP=8000, Dews=4000} }
 }
 
+-- [[ NEW: NIGHTMARE HUNTS ]]
+EnemyData.NightmareHunts = {
+	["Frenzied Beast"] = {
+		IsBoss = true, IsNightmare = true, Name = "Frenzied Beast Titan", Req = 5, Health = 150000,
+		Strength = 800, Defense = 300, Speed = 150, Resolve = 1000, 
+		TitanStats = {Power="S", Speed="B", Hardening="C", Endurance="S", Precision="S", Potential="S"}, 
+		Skills = {"Crushed Boulders", "Titan Roar", "Brutal Swipe"}, 
+		Desc = "A hyper-aggressive variant. Its attacks ignore 50% of your defense.",
+		Drops = { Dews = 250000, XP = 500000, ItemChance = { ["Abyssal Blood"] = 15, ["Glowing Titan Crystal"] = 50, ["Spinal Fluid Syringe"] = 10 } } 
+	},
+	["Abyssal Armored"] = {
+		IsBoss = true, IsNightmare = true, Name = "Abyssal Armored Titan", Req = 8, Health = 300000, 
+		GateType = "Reinforced Skin", GateHP = 150000, Strength = 500, Defense = 800, Speed = 80, Resolve = 2000, 
+		TitanStats = {Power="S", Speed="C", Hardening="S", Endurance="S", Precision="C", Potential="S"}, 
+		Skills = {"Armored Tackle", "Hardened Punch", "Colossal Steam"}, 
+		Desc = "Caked in black, spiked hardening. It is virtually immune to normal blades.",
+		Drops = { Dews = 500000, XP = 1000000, ItemChance = { ["Abyssal Blood"] = 25, ["Coordinate Shard"] = 2, ["Spinal Fluid Syringe"] = 25 } } 
+	},
+	["Doomsday Apparition"] = {
+		IsBoss = true, IsNightmare = true, Name = "Doomsday Apparition", Req = 10, Health = 1000000, 
+		GateType = "Steam", GateHP = 10, Strength = 1500, Defense = 500, Speed = 250, Resolve = 5000, 
+		TitanStats = {Power="S", Speed="S", Hardening="S", Endurance="S", Precision="S", Potential="S"}, 
+		Skills = {"Coordinate Command", "War Hammer Spike", "Colossal Steam"}, 
+		Desc = "A horrific, twisted memory of the Founder. The ultimate challenge.",
+		Drops = { Dews = 2000000, XP = 3000000, ItemChance = { ["Abyssal Blood"] = 100, ["Coordinate Shard"] = 15, ["Ymir's Clay Fragment"] = 5 } } 
+	}
+}
+
 return EnemyData
