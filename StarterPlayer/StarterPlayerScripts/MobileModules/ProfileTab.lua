@@ -22,7 +22,7 @@ local wpnLabel, accLabel, titanLabel, clanLabel, regimentLabel
 local titanAwakenBtn, clanAwakenBtn, prestigeBtn
 local RadarContainer, regIcon, AvatarBox, AvatarAuraGlow, AvatarTitle
 local toggleStatsBtn
-local prestigeValLbl, eloValLbl, regimentValLbl
+local prestigeValLbl, eloValLbl
 local InvTitle 
 local isShowingTitanStats = false
 local MAX_INVENTORY_CAPACITY = 50
@@ -31,7 +31,6 @@ local RarityColors = { ["Common"] = "#AAAAAA", ["Uncommon"] = "#55FF55", ["Rare"
 local RarityOrder = { Transcendent = 0, Mythical = 1, Legendary = 2, Epic = 3, Rare = 4, Uncommon = 5, Common = 6 }
 local SellValues = { Common = 10, Uncommon = 25, Rare = 75, Epic = 200, Legendary = 500, Mythical = 1500, Transcendent = 0 }
 
--- [[ DEFINED HEX COLORS FOR REQUESTED TEXT ]]
 local TEXT_COLORS = { PrestigeYellow = "#FFD700", EloBlue = "#55AAFF", DefaultGreen = "#55FF55" }
 local REG_COLORS = { ["Garrison"] = "#FF5555", ["Military Police"] = "#55FF55", ["Scout Regiment"] = "#55AAFF" }
 
@@ -40,21 +39,47 @@ local function ApplyGradient(label, color1, color2)
 	grad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, color1), ColorSequenceKeypoint.new(1, color2)}
 end
 
+-- [[ THE FIX: Restored text isolation so text stays purely white, disabled AutoButtonColor ]]
 local function ApplyButtonGradient(btn, topColor, botColor, strokeColor)
 	btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	btn.AutoButtonColor = false 
 	local grad = btn:FindFirstChildOfClass("UIGradient") or Instance.new("UIGradient", btn); grad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, topColor), ColorSequenceKeypoint.new(1, botColor)}; grad.Rotation = 90
 	local corner = btn:FindFirstChildOfClass("UICorner") or Instance.new("UICorner", btn); corner.CornerRadius = UDim.new(0, 4)
 	if strokeColor then
 		local stroke = btn:FindFirstChildOfClass("UIStroke") or Instance.new("UIStroke", btn); stroke.Color = strokeColor; stroke.Thickness = 1; stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	end
+
 	if not btn:GetAttribute("GradientTextFixed") then
 		btn:SetAttribute("GradientTextFixed", true)
-		local textLbl = Instance.new("TextLabel", btn); textLbl.Name = "BtnTextLabel"; textLbl.Size = UDim2.new(1, 0, 1, 0); textLbl.BackgroundTransparency = 1; textLbl.Font = btn.Font; textLbl.TextSize = btn.TextSize; textLbl.TextScaled = btn.TextScaled; textLbl.RichText = btn.RichText; textLbl.TextWrapped = btn.TextWrapped; textLbl.TextXAlignment = btn.TextXAlignment; textLbl.TextYAlignment = btn.TextYAlignment; textLbl.ZIndex = btn.ZIndex + 1
-		local tConstraint = btn:FindFirstChildOfClass("UITextSizeConstraint"); if tConstraint then tConstraint.Parent = textLbl end
-		btn.ChildAdded:Connect(function(child) if child:IsA("UITextSizeConstraint") then task.delay(0, function() child.Parent = textLbl end) end end)
-		textLbl.Text = btn.Text; textLbl.TextColor3 = btn.TextColor3; btn.Text = ""
-		btn:GetPropertyChangedSignal("Text"):Connect(function() if btn.Text ~= "" then textLbl.Text = btn.Text; btn.Text = "" end end)
+		local textLbl = Instance.new("TextLabel", btn)
+		textLbl.Name = "BtnTextLabel"
+		textLbl.Size = UDim2.new(1, 0, 1, 0)
+		textLbl.BackgroundTransparency = 1
+		textLbl.Font = btn.Font
+		textLbl.TextSize = btn.TextSize
+		textLbl.TextScaled = btn.TextScaled
+		textLbl.RichText = btn.RichText
+		textLbl.TextWrapped = btn.TextWrapped
+		textLbl.TextXAlignment = btn.TextXAlignment
+		textLbl.TextYAlignment = btn.TextYAlignment
+		textLbl.ZIndex = btn.ZIndex + 1
+
+		local tConstraint = btn:FindFirstChildOfClass("UITextSizeConstraint")
+		if tConstraint then tConstraint.Parent = textLbl end
+
+		btn.ChildAdded:Connect(function(child) 
+			if child:IsA("UITextSizeConstraint") then task.delay(0, function() child.Parent = textLbl end) end 
+		end)
+
+		textLbl.Text = btn.Text
+		textLbl.TextColor3 = btn.TextColor3
+		btn.Text = ""
+
+		btn:GetPropertyChangedSignal("Text"):Connect(function() 
+			if btn.Text ~= "" then textLbl.Text = btn.Text; btn.Text = "" end 
+		end)
 		btn:GetPropertyChangedSignal("TextColor3"):Connect(function() textLbl.TextColor3 = btn.TextColor3 end)
+		btn:GetPropertyChangedSignal("RichText"):Connect(function() textLbl.RichText = btn.RichText end)
 	end
 end
 
@@ -67,7 +92,6 @@ local function TweenGradient(grad, targetTop, targetBot, duration)
 	tween:Play(); tween.Completed:Connect(function() val:Destroy() end)
 end
 
--- Radar Math Preserved Exactly
 local function DrawLineScale(parent, p1x, p1y, p2x, p2y, color, thickness, zindex)
 	local dx = p2x - p1x; local dy = p2y - p1y; local dist = math.sqrt(dx*dx + dy*dy)
 	local frame = Instance.new("Frame", parent)
@@ -143,10 +167,9 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 
 	prestigeValLbl = CreateStyledInfoLabel(InfoTextContainer)
 	eloValLbl = CreateStyledInfoLabel(InfoTextContainer)
-	regimentValLbl = CreateStyledInfoLabel(InfoTextContainer)
 
 	regIcon = Instance.new("ImageLabel", ShowcaseCard)
-	regIcon.Size = UDim2.new(0, 75, 0, 75); regIcon.BackgroundTransparency = 1; regIcon.ZIndex = 6; regIcon.LayoutOrder = 5
+	regIcon.Size = UDim2.new(0, 115, 0, 115); regIcon.BackgroundTransparency = 1; regIcon.ZIndex = 6; regIcon.LayoutOrder = 5
 
 	-- ==========================================
 	-- [[ 2. MIDDLE COLUMN (RADAR & STATS) ]]
@@ -185,7 +208,7 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 	titanAwakenBtn.Font = Enum.Font.GothamBold; titanAwakenBtn.TextColor3 = Color3.fromRGB(255, 255, 255); titanAwakenBtn.TextSize = 10; titanAwakenBtn.Text = "AWAKEN"
 	ApplyButtonGradient(titanAwakenBtn, Color3.fromRGB(200, 60, 60), Color3.fromRGB(120, 30, 30), Color3.fromRGB(80, 20, 20)); titanAwakenBtn.Visible = false
 
-	regimentLabel = CreateInfoLabel(StatsRect)
+	regimentLabel = CreateInfoLabel(StatsRect); regimentLabel.RichText = true
 
 	local clanRow = Instance.new("Frame", StatsRect); clanRow.Size = UDim2.new(1, 0, 0, 36); clanRow.BackgroundTransparency = 1
 	clanLabel = CreateInfoLabel(clanRow); clanLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -193,8 +216,8 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 	clanAwakenBtn.Font = Enum.Font.GothamBold; clanAwakenBtn.TextColor3 = Color3.fromRGB(255, 255, 255); clanAwakenBtn.TextSize = 10; clanAwakenBtn.Text = "AWAKEN"
 	ApplyButtonGradient(clanAwakenBtn, Color3.fromRGB(200, 60, 60), Color3.fromRGB(120, 30, 30), Color3.fromRGB(80, 20, 20)); clanAwakenBtn.Visible = false
 
-	wpnLabel = CreateInfoLabel(StatsRect)
-	accLabel = CreateInfoLabel(StatsRect)
+	wpnLabel = CreateInfoLabel(StatsRect); wpnLabel.RichText = true
+	accLabel = CreateInfoLabel(StatsRect); accLabel.RichText = true
 
 	local ActionRow = Instance.new("Frame", MidCol)
 	ActionRow.Size = UDim2.new(0.95, 0, 0, 40); ActionRow.BackgroundTransparency = 1; ActionRow.LayoutOrder = 3
@@ -408,8 +431,17 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 
 		if cName == "Ackerman" or cName == "Awakened Ackerman" then titanLabel.Text = "Titan: <font color='#FF5555'>(Titan Disabled)</font>" else titanLabel.Text = "Titan: <font color='#FF5555'>" .. tName .. "</font>" end
 		titanLabel.RichText = true; clanLabel.Text = "Clan: <font color='#55FF55'>" .. cName .. "</font>"; clanLabel.RichText = true
-		regimentLabel.Text = "Regiment: <font color='#AAAAAA'>" .. regName .. "</font>"; regimentLabel.RichText = true
-		wpnLabel.Text = "Weapon: " .. (player:GetAttribute("EquippedWeapon") or "None"); accLabel.Text = "Accessory: " .. (player:GetAttribute("EquippedAccessory") or "None")
+
+		regimentLabel.Text = "Regiment: <font color='"..regTextColorHex.."'>" .. regName .. "</font>"
+
+		local wpnName = player:GetAttribute("EquippedWeapon") or "None"
+		local accName = player:GetAttribute("EquippedAccessory") or "None"
+
+		local wpnRarity = (wpnName ~= "None" and ItemData.Equipment and ItemData.Equipment[wpnName]) and ItemData.Equipment[wpnName].Rarity or "Common"
+		local accRarity = (accName ~= "None" and ItemData.Equipment and ItemData.Equipment[accName]) and ItemData.Equipment[accName].Rarity or "Common"
+
+		wpnLabel.Text = "Weapon: <font color='"..(RarityColors[wpnRarity] or "#FFFFFF").."'>" .. wpnName .. "</font>"
+		accLabel.Text = "Accessory: <font color='"..(RarityColors[accRarity] or "#FFFFFF").."'>" .. accName .. "</font>"
 
 		if tName == "Attack Titan" and (player:GetAttribute("YmirsClayFragmentCount") or 0) > 0 then titanAwakenBtn.Visible = true else titanAwakenBtn.Visible = false end
 
@@ -439,7 +471,6 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 		-- [[ APPLY RICH TEXT TO NEW LABELS ]]
 		prestigeValLbl.Text = "Prestige: <font color='"..TEXT_COLORS.PrestigeYellow.."'>"..pres.."</font>"
 		eloValLbl.Text = "Elo: <font color='"..TEXT_COLORS.EloBlue.."'>"..elo.."</font>"
-		regimentValLbl.Text = "Regiment: <font color='"..regTextColorHex.."'>"..regName.."</font>"
 
 		for _, child in ipairs(InvGrid:GetChildren()) do 
 			if child.Name == "ItemCard" then child:Destroy() end 
@@ -700,7 +731,6 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 		if currentSlotsUsed >= MAX_INVENTORY_CAPACITY then InvTitle.TextColor3 = Color3.fromRGB(255, 100, 100) else InvTitle.TextColor3 = Color3.fromRGB(255, 215, 100) end
 
 		task.delay(0.05, function() InvGrid.CanvasSize = UDim2.new(0, 0, 0, math.ceil(layoutOrderCounter / 6) * 95) end)
-		task.delay(0.05, function() TabsWrapper.Size = UDim2.new(0.35, 0, 1, 0) end)
 	end
 
 	player.AttributeChanged:Connect(RefreshProfile)
