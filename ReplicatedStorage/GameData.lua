@@ -2,14 +2,8 @@
 -- @ScriptType: ModuleScript
 local GameData = {}
 
-GameData.TitanRanks = {
-	["E"] = 5, ["D"] = 10, ["C"] = 15,
-	["B"] = 20, ["A"] = 25, ["S"] = 30,
-	["None"] = 0
-}
-
+GameData.TitanRanks = { ["E"] = 5, ["D"] = 10, ["C"] = 15, ["B"] = 20, ["A"] = 25, ["S"] = 30, ["None"] = 0 }
 GameData.BaseStats = { Health = 1, Strength = 1, Defense = 1, Speed = 1, Stamina = 1, Willpower = 1 }
-
 GameData.TitanStats = { "Titan_Power_Val", "Titan_Speed_Val", "Titan_Hardening_Val", "Titan_Endurance_Val", "Titan_Precision_Val", "Titan_Potential_Val" }
 
 GameData.WeaponBonuses = {
@@ -46,65 +40,58 @@ GameData.BattleConditions = {
 	["The Rumbling"] = { Description = "Absolute chaos. Everyone (Player and Enemies) deals +50% damage.", Color = "#FF0000" }
 }
 
-function GameData.GetStatCap(prestige)
-	return 100 + ((prestige or 0) * 10)
-end
+-- [[ NEW: PRESTIGE SKILL TREE NODES ]]
+GameData.PrestigeNodes = {
+	-- SCOUT BRANCH (Agility & Crit)
+	["Scout_1"] = { Name = "ODM Mastery I", Cost = 1, Req = nil, BuffType = "FlatStat", BuffStat = "Speed", BuffValue = 15, Desc = "Increases Base Speed by 15.", Pos = UDim2.new(0.2, 0, 0.1, 0), Color = "#55AAFF" },
+	["Scout_2"] = { Name = "Acrobatic Evasion", Cost = 1, Req = "Scout_1", BuffType = "Special", BuffStat = "DodgeBonus", BuffValue = 5, Desc = "Increases Base Dodge Chance by 5%.", Pos = UDim2.new(0.2, 0, 0.35, 0), Color = "#55AAFF" },
+	["Scout_3"] = { Name = "Lethal Momentum", Cost = 2, Req = "Scout_2", BuffType = "Special", BuffStat = "DmgMult", BuffValue = 0.15, Desc = "Multiplies all Weapon Damage by +15%.", Pos = UDim2.new(0.2, 0, 0.6, 0), Color = "#55AAFF" },
+	["Scout_4"] = { Name = "Ackerman Reflexes", Cost = 3, Req = "Scout_3", BuffType = "Special", BuffStat = "CritBonus", BuffValue = 10, Desc = "Increases Critical Hit Chance by 10%.", Pos = UDim2.new(0.2, 0, 0.85, 0), Color = "#FF5555" },
+
+	-- COMMANDER BRANCH (Survival & Tanking)
+	["Cmdr_1"] = { Name = "Iron Resolve", Cost = 1, Req = nil, BuffType = "FlatStat", BuffStat = "Resolve", BuffValue = 15, Desc = "Increases Base Resolve by 15.", Pos = UDim2.new(0.5, 0, 0.1, 0), Color = "#FFD700" },
+	["Cmdr_2"] = { Name = "Unflinching", Cost = 1, Req = "Cmdr_1", BuffType = "FlatStat", BuffStat = "Health", BuffValue = 20, Desc = "Increases Base Health by 200.", Pos = UDim2.new(0.5, 0, 0.35, 0), Color = "#FFD700" },
+	["Cmdr_3"] = { Name = "Vanguard Leader", Cost = 2, Req = "Cmdr_2", BuffType = "FlatStat", BuffStat = "Defense", BuffValue = 25, Desc = "Increases Base Defense by 25.", Pos = UDim2.new(0.5, 0, 0.6, 0), Color = "#FFD700" },
+	["Cmdr_4"] = { Name = "Shinzo wo Sasageyo!", Cost = 3, Req = "Cmdr_3", BuffType = "Special", BuffStat = "Survivals", BuffValue = 1, Desc = "Survive lethal blows at 1 HP one additional time.", Pos = UDim2.new(0.5, 0, 0.85, 0), Color = "#FFD700" },
+
+	-- TITAN BRANCH (Shifter Power & Armor Pierce)
+	["Titan_1"] = { Name = "Shifter Endurance", Cost = 1, Req = nil, BuffType = "FlatStat", BuffStat = "Titan_Endurance_Val", BuffValue = 15, Desc = "Increases Base Titan Endurance by 15.", Pos = UDim2.new(0.8, 0, 0.1, 0), Color = "#AA55FF" },
+	["Titan_2"] = { Name = "Hardened Carapace", Cost = 1, Req = "Titan_1", BuffType = "FlatStat", BuffStat = "Titan_Hardening_Val", BuffValue = 20, Desc = "Increases Base Titan Hardening by 20.", Pos = UDim2.new(0.8, 0, 0.35, 0), Color = "#AA55FF" },
+	["Titan_3"] = { Name = "Primordial Roar", Cost = 2, Req = "Titan_2", BuffType = "FlatStat", BuffStat = "Titan_Power_Val", BuffValue = 25, Desc = "Increases Base Titan Power by 25.", Pos = UDim2.new(0.8, 0, 0.6, 0), Color = "#AA55FF" },
+	["Titan_4"] = { Name = "Coordinate Resonance", Cost = 3, Req = "Titan_3", BuffType = "Special", BuffStat = "IgnoreArmor", BuffValue = 0.20, Desc = "All attacks ignore 20% of the enemy's Armor.", Pos = UDim2.new(0.8, 0, 0.85, 0), Color = "#AA55FF" }
+}
+
+function GameData.GetStatCap(prestige) return 100 + ((prestige or 0) * 10) end
 
 function GameData.CalculateStatCost(currentStat, baseStat, prestige)
-	local baseCost = 10
-	local growthFactor = 1.05
-	local prestigeMultiplier = math.max(0.1, 1 - (prestige * 0.03))
+	local baseCost = 10; local growthFactor = 1.05; local prestigeMultiplier = math.max(0.1, 1 - (prestige * 0.03))
 	local statDifference = math.max(0, currentStat - baseStat)
 	return math.floor(baseCost * (growthFactor ^ statDifference) * prestigeMultiplier)
 end
 
 function GameData.GetMaxInventory(player)
 	if not player then return 15 end
-	local baseMax = 15
-
-	local clanBoost = player:GetAttribute("ClanInvBoost") or 0
-
+	local totalCapacity = 15 + (player:GetAttribute("ClanInvBoost") or 0)
 	local ls = player:FindFirstChild("leaderstats")
 	local elo = ls and ls:FindFirstChild("Elo") and ls.Elo.Value or 1000
-	local eloBoost = elo >= 4000 and 5 or 0
-
-	local totalCapacity = baseMax + clanBoost + eloBoost
-
-	-- [[ THE FIX: Applied Backpack Expansion Gamepass ]]
-	if player:GetAttribute("HasBackpackExpansion") then
-		totalCapacity = totalCapacity + 50
-	end
-
-	if player:GetAttribute("Has2xInventory") then
-		totalCapacity = totalCapacity * 2
-	end
-
+	if elo >= 4000 then totalCapacity = totalCapacity + 5 end
+	if player:GetAttribute("HasBackpackExpansion") then totalCapacity = totalCapacity + 50 end
+	if player:GetAttribute("Has2xInventory") then totalCapacity = totalCapacity * 2 end
 	return totalCapacity
 end
 
 function GameData.GetInventoryCount(player)
 	if not player then return 0 end
 	local count = 0
-
 	local ItemData = require(game:GetService("ReplicatedStorage"):WaitForChild("ItemData"))
 	local ignoredKeys = {}
-
-	for itemName, data in pairs(ItemData.Consumables) do
-		ignoredKeys[itemName:gsub("[^%w]", "") .. "Count"] = true
-	end
-
-	for itemName, data in pairs(ItemData.Equipment) do
-		if data.Rarity == "Unique" then
-			ignoredKeys[itemName:gsub("[^%w]", "") .. "Count"] = true
-		end
-	end
+	for itemName, data in pairs(ItemData.Consumables) do ignoredKeys[itemName:gsub("[^%w]", "") .. "Count"] = true end
+	for itemName, data in pairs(ItemData.Equipment) do if data.Rarity == "Unique" then ignoredKeys[itemName:gsub("[^%w]", "") .. "Count"] = true end end
 
 	local attrs = player:GetAttributes()
 	for key, val in pairs(attrs) do
 		if type(val) == "number" and val > 0 and string.sub(key, -5) == "Count" then
-			if not ignoredKeys[key] then
-				count += val
-			end
+			if not ignoredKeys[key] then count += val end
 		end
 	end
 	return count
