@@ -3,6 +3,7 @@
 local CombatCore = {}
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SkillData = require(ReplicatedStorage:WaitForChild("SkillData"))
+local ItemData = require(ReplicatedStorage:WaitForChild("ItemData"))
 
 function CombatCore.CalculateDamage(attacker, defender, skillMult, targetLimb)
 	local atkBuff = 1.0
@@ -54,6 +55,14 @@ function CombatCore.CalculateDamage(attacker, defender, skillMult, targetLimb)
 	if attacker.AwakenedStats and (tonumber(attacker.AwakenedStats.IgnoreArmor) or 0) > 0 then
 		effectiveArmor = effectiveArmor * (1.0 - (tonumber(attacker.AwakenedStats.IgnoreArmor) or 0))
 	end
+	if attacker.IsPlayer then
+		local prestigeIgnore = tonumber(attacker.PlayerObj:GetAttribute("Prestige_IgnoreArmor")) or 0
+		effectiveArmor = effectiveArmor * (1.0 - prestigeIgnore)
+	end
+	if attacker.IsNightmare then
+		effectiveArmor = effectiveArmor * 0.5 
+	end
+
 	effectiveArmor = math.max(0, effectiveArmor)
 
 	local defenseMultiplier = 1.0
@@ -111,6 +120,10 @@ function CombatCore.CalculateDamage(attacker, defender, skillMult, targetLimb)
 	if attacker.AwakenedStats and (tonumber(attacker.AwakenedStats.DmgMult) or 1.0) > 1.0 then
 		baseDmg = baseDmg * (tonumber(attacker.AwakenedStats.DmgMult) or 1.0)
 	end
+	if attacker.IsPlayer then
+		local prestigeDmg = tonumber(attacker.PlayerObj:GetAttribute("Prestige_DmgMult")) or 0
+		baseDmg = baseDmg * (1.0 + prestigeDmg)
+	end
 
 	local finalDmg = baseDmg * defenseMultiplier
 	return math.max(1, finalDmg)
@@ -152,6 +165,9 @@ function CombatCore.TakeDamage(combatant, damage, attackerStyle)
 			if combatant.IsPlayer and cBaseClan == "Ackerman" then 
 				survivalChance = 100; maxSurvivals = cIsAwakened and 3 or 1 
 			end
+			if combatant.IsPlayer then
+				maxSurvivals = maxSurvivals + (tonumber(combatant.PlayerObj:GetAttribute("Prestige_Survivals")) or 0)
+			end
 
 			local usedSurvivals = tonumber(combatant.ResolveSurvivals) or 0
 			if usedSurvivals < maxSurvivals and math.random(1, 100) <= survivalChance then
@@ -190,7 +206,6 @@ function CombatCore.ExecuteStrike(attacker, defender, skillName, targetLimb, log
 		isSequenceCombo = true; comboMult = tonumber(skill.ComboMult) or 1.5 
 	end
 
-	-- [[ FIX: Self-Buff Bypass! Prevents buffs from missing or giving the enemy the buff ]]
 	if skill.Effect == "Block" or skillName == "Maneuver" or skillName == "Evasive Maneuver" then
 		if not attacker.Statuses then attacker.Statuses = {} end
 		local blind = tonumber(attacker.Statuses.Blinded) or 0
@@ -295,10 +310,23 @@ function CombatCore.ExecuteStrike(attacker, defender, skillName, targetLimb, log
 		if defender.AwakenedStats and (tonumber(defender.AwakenedStats.DodgeBonus) or 0) > 0 then
 			dodgeChance = dodgeChance + tonumber(defender.AwakenedStats.DodgeBonus)
 		end
+		if defender.IsPlayer then
+			dodgeChance = dodgeChance + (tonumber(defender.PlayerObj:GetAttribute("Prestige_DodgeBonus")) or 0)
+		end
 
 		dodgeChance = math.clamp(dodgeChance or 0, 0, 80)
 		if isDodging then dodgeChance = 100 end
 		if defender.Statuses and (tonumber(defender.Statuses.Immobilized) or 0) > 0 then dodgeChance = 0 end
+
+		-- [[ NEW: Cursed Shroud Dodge Nullification ]]
+		if defender.IsPlayer then
+			local accName = defender.PlayerObj:GetAttribute("EquippedAccessory")
+			local accData = accName and ItemData.Equipment[accName]
+			if accData and accData.NoDodge then
+				dodgeChance = 0
+				isDodging = false
+			end
+		end
 
 		if math.random(1, 100) <= (dodgeChance or 0) then
 			if hitsToDo == 1 then 
@@ -322,6 +350,7 @@ function CombatCore.ExecuteStrike(attacker, defender, skillName, targetLimb, log
 			if aBaseClan == "Galliard" and string.find(aTitan, "Jaw Titan") then
 				critChance = critChance + 25
 			end
+			critChance = critChance + (tonumber(attacker.PlayerObj:GetAttribute("Prestige_CritBonus")) or 0)
 		end
 
 		local isCrit = math.random(1, 100) <= (critChance or 0)
@@ -365,7 +394,6 @@ function CombatCore.ExecuteStrike(attacker, defender, skillName, targetLimb, log
 						defender.Gas = math.max(0, (tonumber(defender.Gas) or 0) - 40)
 						effectLog = effectLog .. " <font color='#FF5555'>[-40 GAS]</font>"
 					end
-					-- [[ FIX: Added buff routing just in case an attack skill also buffs the attacker ]]
 				elseif string.find(safeEffect, "Buff_") then
 					if not attacker.Statuses then attacker.Statuses = {} end
 					attacker.Statuses[safeEffect] = tonumber(skill.Duration) or 2
@@ -461,6 +489,17 @@ function CombatCore.ExecuteStrike(attacker, defender, skillName, targetLimb, log
 		if not didHitAtAll then finalMsg = fLogName .. " unleashed <b>" .. skillName .. "</b>, but " .. fDefName .. " dodged completely!"
 		else finalMsg = fLogName .. " used <b>" .. skillName .. "</b>!" .. synergyTag .. "\n" .. table.concat(hitLogs, "\n") end
 	else finalMsg = hitLogs[1] or "" end
+
+	-- [[ NEW: Cursed Weapon Self-Damage Calculation ]]
+	if attacker.IsPlayer and didHitAtAll then
+		local wpnName = attacker.PlayerObj:GetAttribute("EquippedWeapon")
+		local wpnData = wpnName and ItemData.Equipment[wpnName]
+		if wpnData and wpnData.SelfDamage then
+			local recoil = math.floor((tonumber(attacker.MaxHP) or 100) * wpnData.SelfDamage)
+			attacker.HP = math.max(1, (tonumber(attacker.HP) or 100) - recoil)
+			finalMsg = finalMsg .. "\n<font color='#FF3333'>[" .. attacker.Name .. " took " .. recoil .. " recoil damage from their Cursed Weapon!]</font>"
+		end
+	end
 
 	attacker.LastSkill = skillName
 	return finalMsg, didHitAtAll, overallShake
