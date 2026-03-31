@@ -93,6 +93,7 @@ local function StartBattle(player, encounterType, requestedPartId)
 	local isEndless = false
 	local isPaths = false
 	local isWorldBoss = false
+	local isNightmare = false
 	local activeMissionData = nil
 	local totalWaves = 1
 	local startingWave = 1
@@ -132,7 +133,6 @@ local function StartBattle(player, encounterType, requestedPartId)
 		local floor = player:GetAttribute("PathsFloor") or 1
 		targetPart = 1 
 
-		-- [[ THE FIX: Progressively scales the pool of available memories based on the floor ]]
 		local maxMemoryIndex = math.min(#EnemyData.PathsMemories, math.max(1, math.ceil(floor / 3)))
 		eTemplate = EnemyData.PathsMemories[math.random(1, maxMemoryIndex)]
 		logFlavor = "<font color='#55FFFF'>[THE PATHS - MEMORY " .. floor .. "]</font>\nA manifestation of " .. eTemplate.Name .. " emerges from the sand..."
@@ -142,6 +142,14 @@ local function StartBattle(player, encounterType, requestedPartId)
 		eTemplate = EnemyData.WorldBosses[requestedPartId]
 		if not eTemplate then return end
 		logFlavor = "<font color='#FFAA00'>[WORLD EVENT]</font>\n" .. eTemplate.Name .. " has appeared!"
+		targetPart = 1 
+
+		-- [[ FIX: Routing Nightmare Hunts into the data table ]]
+	elseif encounterType == "EngageNightmare" then
+		isNightmare = true
+		eTemplate = EnemyData.NightmareHunts[requestedPartId]
+		if not eTemplate then return end
+		logFlavor = "<font color='#FF5555'>[NIGHTMARE HUNT]</font>\n" .. eTemplate.Name .. " approaches!"
 		targetPart = 1 
 	else
 		targetPart = math.min(8, currentPart)
@@ -159,7 +167,6 @@ local function StartBattle(player, encounterType, requestedPartId)
 		hpMult *= 1.4; dmgMult *= 1.4; dropMult *= 1.5 
 	elseif isPaths then
 		local floor = player:GetAttribute("PathsFloor") or 1
-		-- [[ THE FIX: Weak early scaling (35% base) that multiplies exponentially per floor ]]
 		local pathScale = 0.35 * math.pow(1.20, floor - 1) 
 		hpMult = hpMult * pathScale
 		dmgMult = dmgMult * pathScale
@@ -238,7 +245,7 @@ local function StartBattle(player, encounterType, requestedPartId)
 
 	ActiveBattles[player.UserId] = {
 		IsProcessing = false,
-		Context = { IsStoryMission = isStory, IsEndless = isEndless, IsPaths = isPaths, IsWorldBoss = isWorldBoss, TargetPart = targetPart, CurrentWave = startingWave, TotalWaves = totalWaves, MissionData = activeMissionData, TurnCount = 0, Range = ctxRange, GapCloses = 0 },
+		Context = { IsStoryMission = isStory, IsEndless = isEndless, IsPaths = isPaths, IsWorldBoss = isWorldBoss, IsNightmare = isNightmare, TargetPart = targetPart, CurrentWave = startingWave, TotalWaves = totalWaves, MissionData = activeMissionData, TurnCount = 0, Range = ctxRange, GapCloses = 0 },
 		Player = {
 			IsPlayer = true, Name = player.Name, PlayerObj = player, Titan = player:GetAttribute("Titan") or "None",
 			Style = GetActualStyle(player), Clan = clanName,
@@ -399,7 +406,6 @@ local function ProcessEnemyDeath(player, battle)
 		local rewardStr = "<font color='#55FFFF'>Memory Cleared! +" .. dustGain .. " Path Dust</font>"
 		local prestige = player.leaderstats.Prestige.Value
 
-		-- [[ THE FIX: Progressively scaled pool based on next floor ]]
 		local maxMemoryIndex = math.min(#EnemyData.PathsMemories, math.max(1, math.ceil((floor + 1) / 3)))
 		local nextEnemyTemplate = EnemyData.PathsMemories[math.random(1, maxMemoryIndex)]
 
@@ -574,8 +580,9 @@ local function ProcessEnemyDeath(player, battle)
 	end
 end
 
+-- [[ THE FIX: Added EngageNightmare to the initial receiver so it actually launches ]]
 CombatAction.OnServerEvent:Connect(function(player, actionType, actionData)
-	if actionType == "EngageRandom" or actionType == "EngageStory" or actionType == "EngageEndless" or actionType == "EngagePaths" or actionType == "EngageWorldBoss" then 
+	if actionType == "EngageRandom" or actionType == "EngageStory" or actionType == "EngageEndless" or actionType == "EngagePaths" or actionType == "EngageWorldBoss" or actionType == "EngageNightmare" then 
 		local pId = actionData and (actionData.PartId or actionData.BossId) or nil; StartBattle(player, actionType, pId); return 
 	end
 
