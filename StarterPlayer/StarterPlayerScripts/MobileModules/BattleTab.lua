@@ -125,7 +125,6 @@ local function RefreshServerList()
 				ApplyButtonGradient(invBtn, Color3.fromRGB(40, 40, 45), Color3.fromRGB(20, 20, 25), Color3.fromRGB(60, 60, 70))
 				invBtn.TextColor3 = Color3.fromRGB(120, 120, 120)
 				invBtn.MouseButton1Click:Connect(function()
-					-- [[ THE FIX: Use NotificationManager locally ]]
 					if NotificationManager then NotificationManager.Show("Only the Party Leader can invite.", "Error") end
 				end)
 			end
@@ -359,7 +358,6 @@ function BattleTab.Init(parentFrame)
 				InviteBox.Text = ""
 			end
 		else
-			-- [[ THE FIX: Use NotificationManager locally ]]
 			if NotificationManager then NotificationManager.Show("Only the Party Leader can invite.", "Error") end
 		end
 	end)
