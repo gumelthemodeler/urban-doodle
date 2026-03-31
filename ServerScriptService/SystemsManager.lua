@@ -439,3 +439,22 @@ Network:WaitForChild("PrestigeEvent").OnServerEvent:Connect(function(player)
 		NotificationEvent:FireClient(player, "You must clear the Campaign (Part 8) before you can Prestige!", "Error")
 	end
 end)
+
+-- [[ COSMETICS SYSTEM (PURE UI) ]]
+local EquipCosmetic = Network:FindFirstChild("EquipCosmetic") or Instance.new("RemoteEvent", Network)
+EquipCosmetic.Name = "EquipCosmetic"
+
+EquipCosmetic.OnServerEvent:Connect(function(player, cosType, cosKey)
+	local CosmeticData = require(ReplicatedStorage:WaitForChild("CosmeticData"))
+	local dataPool = (cosType == "Title") and CosmeticData.Titles or CosmeticData.Auras
+	local data = dataPool[cosKey]
+
+	if data then
+		if CosmeticData.CheckUnlock(player, data.ReqType, data.ReqValue) then
+			player:SetAttribute("Equipped" .. cosType, cosKey)
+			NotificationEvent:FireClient(player, "Equipped " .. data.Name .. "!", "Success")
+		else
+			NotificationEvent:FireClient(player, "You have not unlocked this cosmetic.", "Error")
+		end
+	end
+end)
