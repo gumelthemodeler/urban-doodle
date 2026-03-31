@@ -40,10 +40,15 @@ TitanData.Titans = {
 		Name = "Founding Titan", Rarity = "Mythical",
 		Stats = {Power="S", Speed="D", Hardening="S", Endurance="S", Precision="S", Potential="S"}
 	},
+
+	-- [[ TRANSCENDENT FUSIONS ]]
 	["Founding Female Titan"] = { Name = "Founding Female Titan", Rarity = "Transcendent", Stats = {Power="S", Speed="S", Hardening="S", Endurance="S", Precision="S", Potential="S"} },
 	["Armored Attack Titan"] = { Name = "Armored Attack Titan", Rarity = "Transcendent", Stats = {Power="S", Speed="A", Hardening="S", Endurance="S", Precision="A", Potential="S"} },
 	["War Hammer Attack Titan"] = { Name = "War Hammer Attack Titan", Rarity = "Transcendent", Stats = {Power="S", Speed="S", Hardening="S", Endurance="S", Precision="A", Potential="S"} },
-	["Colossal Jaw Titan"] = { Name = "Colossal Jaw Titan", Rarity = "Transcendent", Stats = {Power="S", Speed="S", Hardening="B", Endurance="A", Precision="A", Potential="S"} }
+	["Colossal Jaw Titan"] = { Name = "Colossal Jaw Titan", Rarity = "Transcendent", Stats = {Power="S", Speed="S", Hardening="B", Endurance="A", Precision="A", Potential="S"} },
+
+	-- [[ FIX: ADDED FOUNDING ATTACK TITAN ]]
+	["Founding Attack Titan"] = { Name = "Founding Attack Titan", Rarity = "Transcendent", Stats = {Power="S", Speed="S", Hardening="S", Endurance="S", Precision="S", Potential="S"} }
 }
 
 -- [[ GACHA WEIGHTS ]]
