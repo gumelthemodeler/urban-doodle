@@ -59,8 +59,19 @@ function CombatCore.CalculateDamage(attacker, defender, skillMult, targetLimb)
 		local prestigeIgnore = tonumber(attacker.PlayerObj:GetAttribute("Prestige_IgnoreArmor")) or 0
 		effectiveArmor = effectiveArmor * (1.0 - prestigeIgnore)
 	end
-	if attacker.IsNightmare then
+
+	-- [[ UNIQUE NIGHTMARE MECHANIC: Frenzied Beast Titan ]]
+	if attacker.Name == "Frenzied Beast Titan" or attacker.IsNightmare then
 		effectiveArmor = effectiveArmor * 0.5 
+	end
+
+	-- [[ UNIQUE NIGHTMARE MECHANIC: Abyssal Armored Titan ]]
+	if defender.Name == "Abyssal Armored Titan" then
+		local aStyle = tostring(attacker.Style or "None")
+		if attacker.IsPlayer and not isAttackerTransformed and (aStyle == "Ultrahard Steel Blades" or aStyle == "None") then
+			-- 90% damage reduction against standard blades
+			baseDmg = baseDmg * 0.1 
+		end
 	end
 
 	effectiveArmor = math.max(0, effectiveArmor)
@@ -318,7 +329,6 @@ function CombatCore.ExecuteStrike(attacker, defender, skillName, targetLimb, log
 		if isDodging then dodgeChance = 100 end
 		if defender.Statuses and (tonumber(defender.Statuses.Immobilized) or 0) > 0 then dodgeChance = 0 end
 
-		-- [[ NEW: Cursed Shroud Dodge Nullification ]]
 		if defender.IsPlayer then
 			local accName = defender.PlayerObj:GetAttribute("EquippedAccessory")
 			local accData = accName and ItemData.Equipment[accName]
@@ -361,6 +371,32 @@ function CombatCore.ExecuteStrike(attacker, defender, skillName, targetLimb, log
 
 		local effectLog = ""
 		local isArmored = defender.GateType == "Reinforced Skin" and (tonumber(defender.GateHP) or 0) > 0
+
+		-- [[ UNIQUE NIGHTMARE MECHANIC: Doomsday Apparition ]]
+		if attacker.Name == "Doomsday Apparition" and defender.IsPlayer then
+			defender.Gas = math.max(0, (tonumber(defender.Gas) or 0) - 15)
+			if defender.TitanEnergy then
+				defender.TitanEnergy = math.max(0, (tonumber(defender.TitanEnergy) or 0) - 15)
+			end
+			if not defender.Statuses then defender.Statuses = {} end
+			defender.Statuses["Burn"] = math.max((tonumber(defender.Statuses["Burn"]) or 0), 2)
+			effectLog = effectLog .. " <font color='#FFAA00'>[DOOMSDAY AURA: Sapped 15 Gas/Heat & Inflicted Burn!]</font>"
+		end
+
+		-- [[ UNIQUE NIGHTMARE MECHANIC: Abyssal Armored Titan ]]
+		if attacker.Name == "Abyssal Armored Titan" and defender.IsPlayer then
+			if not defender.Statuses then defender.Statuses = {} end
+			defender.Statuses["Bleed"] = math.max((tonumber(defender.Statuses["Bleed"]) or 0), 2)
+			effectLog = effectLog .. " <font color='#FF5555'>[ABYSSAL SPIKES: Bleed Inflicted!]</font>"
+		end
+
+		if defender.Name == "Abyssal Armored Titan" and attacker.IsPlayer then
+			local aStyle = tostring(attacker.Style or "None")
+			local isTransformed = attacker.Statuses and (tonumber(attacker.Statuses.Transformed) or 0) > 0
+			if not isTransformed and (aStyle == "Ultrahard Steel Blades" or aStyle == "None") then
+				effectLog = effectLog .. " <font color='#555555'>[BLADES DEFLECTED: Minimal Damage!]</font>"
+			end
+		end
 
 		if skill.Effect and skill.Effect ~= "None" and skill.Effect ~= "Block" and skill.Effect ~= "Rest" and skill.Effect ~= "Flee" and skill.Effect ~= "Transform" and skill.Effect ~= "Eject" and skill.Effect ~= "TitanRest" and skill.Effect ~= "FallBack" and skill.Effect ~= "CloseGap" then
 			if not defender.Statuses then defender.Statuses = {} end
@@ -490,7 +526,6 @@ function CombatCore.ExecuteStrike(attacker, defender, skillName, targetLimb, log
 		else finalMsg = fLogName .. " used <b>" .. skillName .. "</b>!" .. synergyTag .. "\n" .. table.concat(hitLogs, "\n") end
 	else finalMsg = hitLogs[1] or "" end
 
-	-- [[ NEW: Cursed Weapon Self-Damage Calculation ]]
 	if attacker.IsPlayer and didHitAtAll then
 		local wpnName = attacker.PlayerObj:GetAttribute("EquippedWeapon")
 		local wpnData = wpnName and ItemData.Equipment[wpnName]
