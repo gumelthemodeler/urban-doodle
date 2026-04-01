@@ -144,7 +144,6 @@ local function StartBattle(player, encounterType, requestedPartId)
 		logFlavor = "<font color='#FFAA00'>[WORLD EVENT]</font>\n" .. eTemplate.Name .. " has appeared!"
 		targetPart = 1 
 
-		-- [[ FIX: Routing Nightmare Hunts into the data table ]]
 	elseif encounterType == "EngageNightmare" then
 		isNightmare = true
 		eTemplate = EnemyData.NightmareHunts[requestedPartId]
@@ -256,6 +255,7 @@ local function StartBattle(player, encounterType, requestedPartId)
 		Enemy = {
 			IsMinigame = isMinigame,
 			IsPlayer = false, Name = eTemplate.Name, IsHuman = isPaths and false or (eTemplate.IsHuman or false),
+			IsNightmare = isNightmare, -- [[ FIX: Passes the true/false flag down to CombatCore ]]
 			HP = eHP, MaxHP = eHP, GateType = eGateType, GateHP = eGateHP, MaxGateHP = eGateHP,
 			TotalStrength = eStr, TotalDefense = eDef, TotalSpeed = eSpd,
 			Statuses = {}, Cooldowns = {}, Skills = eTemplate.Skills or {"Brutal Swipe"},
@@ -448,7 +448,7 @@ local function ProcessEnemyDeath(player, battle)
 		end
 
 		battle.Enemy = {
-			IsMinigame = nextEnemyTemplate.IsMinigame, IsPlayer = false, Name = nextEnemyTemplate.Name, IsHuman = false, 
+			IsMinigame = nextEnemyTemplate.IsMinigame, IsPlayer = false, Name = nextEnemyTemplate.Name, IsHuman = false, IsNightmare = false,
 			HP = eHP, MaxHP = eHP, GateType = eGateType, GateHP = eGateHP, MaxGateHP = eGateHP, TotalStrength = eStr, TotalDefense = eDef, TotalSpeed = eSpd,
 			Statuses = {}, Cooldowns = {}, Skills = nextEnemyTemplate.Skills or {"Brutal Swipe"},
 			Drops = { XP = math.floor((nextEnemyTemplate.Drops and nextEnemyTemplate.Drops.XP or 15) * dropMult), Dews = math.floor((nextEnemyTemplate.Drops and nextEnemyTemplate.Drops.Dews or 10) * dropMult), ItemChance = nextEnemyTemplate.Drops and nextEnemyTemplate.Drops.ItemChance or {} },
@@ -493,7 +493,7 @@ local function ProcessEnemyDeath(player, battle)
 
 		battle.Context.TurnCount = 0; battle.Context.StoredBoss = nil
 		battle.Enemy = {
-			IsMinigame = nextEnemyTemplate.IsMinigame, IsPlayer = false, Name = nextEnemyTemplate.Name, IsHuman = nextEnemyTemplate.IsHuman or false,
+			IsMinigame = nextEnemyTemplate.IsMinigame, IsPlayer = false, Name = nextEnemyTemplate.Name, IsHuman = nextEnemyTemplate.IsHuman or false, IsNightmare = false,
 			HP = eHP, MaxHP = eHP, GateType = eGateType, GateHP = eGateHP, MaxGateHP = eGateHP, TotalStrength = eStr, TotalDefense = eDef, TotalSpeed = eSpd,
 			Statuses = {}, Cooldowns = {}, Skills = nextEnemyTemplate.Skills or {"Brutal Swipe"},
 			Drops = { XP = math.floor((nextEnemyTemplate.Drops and nextEnemyTemplate.Drops.XP or 15) * dropMult), Dews = math.floor((nextEnemyTemplate.Drops and nextEnemyTemplate.Drops.Dews or 10) * dropMult), ItemChance = nextEnemyTemplate.Drops and nextEnemyTemplate.Drops.ItemChance or {} },
@@ -550,7 +550,7 @@ local function ProcessEnemyDeath(player, battle)
 		battle.Context.TurnCount = 0; battle.Context.StoredBoss = nil
 
 		battle.Enemy = {
-			IsMinigame = nextEnemyTemplate.IsMinigame, IsPlayer = false, Name = nextEnemyTemplate.Name, IsHuman = nextEnemyTemplate.IsHuman or false,
+			IsMinigame = nextEnemyTemplate.IsMinigame, IsPlayer = false, Name = nextEnemyTemplate.Name, IsHuman = nextEnemyTemplate.IsHuman or false, IsNightmare = false,
 			HP = math.floor(nextEnemyTemplate.Health * hpMult), MaxHP = math.floor(nextEnemyTemplate.Health * hpMult),
 			GateType = nextEnemyTemplate.GateType, GateHP = math.floor((nextEnemyTemplate.GateHP or 0) * (nextEnemyTemplate.GateType == "Steam" and 1 or hpMult)), MaxGateHP = math.floor((nextEnemyTemplate.GateHP or 0) * (nextEnemyTemplate.GateType == "Steam" and 1 or hpMult)),
 			TotalStrength = math.floor(nextEnemyTemplate.Strength * dmgMult), TotalDefense = math.floor(nextEnemyTemplate.Defense * dmgMult), TotalSpeed = math.floor(nextEnemyTemplate.Speed * dmgMult),
@@ -580,7 +580,6 @@ local function ProcessEnemyDeath(player, battle)
 	end
 end
 
--- [[ THE FIX: Added EngageNightmare to the initial receiver so it actually launches ]]
 CombatAction.OnServerEvent:Connect(function(player, actionType, actionData)
 	if actionType == "EngageRandom" or actionType == "EngageStory" or actionType == "EngageEndless" or actionType == "EngagePaths" or actionType == "EngageWorldBoss" or actionType == "EngageNightmare" then 
 		local pId = actionData and (actionData.PartId or actionData.BossId) or nil; StartBattle(player, actionType, pId); return 
