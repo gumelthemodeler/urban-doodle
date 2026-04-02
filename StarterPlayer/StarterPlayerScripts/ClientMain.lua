@@ -6,6 +6,8 @@ local TweenService = game:GetService("TweenService")
 local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
 
+local AdminManager = require(ReplicatedStorage:WaitForChild("AdminManager"))
+
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -100,7 +102,7 @@ if isMobile then
 	NavBar.AutomaticCanvasSize = Enum.AutomaticSize.X; NavBar.ScrollingDirection = Enum.ScrollingDirection.X
 	nbl.FillDirection = Enum.FillDirection.Horizontal; nbl.HorizontalAlignment = Enum.HorizontalAlignment.Left; nbl.VerticalAlignment = Enum.VerticalAlignment.Center
 	nbp.PaddingLeft = UDim.new(0, 10); nbp.PaddingRight = UDim.new(0, 10)
-	ContentFrame.Size = UDim2.new(1, -20, 1, -160); ContentFrame.Position = UDim2.new(0, 10, 0, 60)
+	ContentFrame.Size = UDim2.new(1, -20, 1, -110); ContentFrame.Position = UDim2.new(0, 10, 0, 60)
 else
 	NavWrapper.Size = UDim2.new(0, 130, 1, -50); NavWrapper.Position = UDim2.new(0, -130, 0, 50) 
 	NavBar.AutomaticCanvasSize = Enum.AutomaticSize.Y; NavBar.ScrollingDirection = Enum.ScrollingDirection.Y
@@ -109,9 +111,10 @@ else
 	ContentFrame.Size = UDim2.new(1, -160, 1, -70); ContentFrame.Position = UDim2.new(0, 145, 0, 60)
 end
 
+-- [[ FIX: PVP Cleanly removed from Navigation ]]
 local NavStructure = {
-	["PLAYER"] = { {Id="Profile", Name="PROFILE"}, {Id="Stats", Name="STATS"}, {Id="Inherit", Name="INHERIT"}, {Id="Prestige", Name="TALENTS"} }, -- <--- ADDED HERE
-	["OPERATIONS"] = { {Id="Battle", Name="COMBAT"}, {Id="Bounties", Name="BOUNTIES"}, {Id="Dispatch", Name="EXPEDITIONS"}, {Id="PVP", Name="PVP"} },
+	["PLAYER"] = { {Id="Profile", Name="PROFILE"}, {Id="Stats", Name="STATS"}, {Id="Inherit", Name="INHERIT"}, {Id="Prestige", Name="TALENTS"} },
+	["OPERATIONS"] = { {Id="Battle", Name="COMBAT"}, {Id="Bounties", Name="BOUNTIES"}, {Id="Dispatch", Name="EXPEDITIONS"} },
 	["SUPPLY"] = { {Id="Shop", Name="SHOP"}, {Id="Forge", Name="FORGE"}, {Id="Trade", Name="TRADE"} }
 }
 
@@ -122,11 +125,12 @@ local CategoryIcons = { ["PLAYER"] = "rbxassetid://106161709171988", ["OPERATION
 local ActiveCategory = nil; local ActiveTab = nil; local TabModules = {}; local SubButtons = {}
 local CategoryCallbacks = {}
 
--- [[ THE FIX: Define Admin Check Early ]]
-local isAdmin = (player.UserId == 4068160397 or player.Name == "girthbender1209")
+local isAdmin = AdminManager.IsAdmin(player)
 
 local function SwitchTab(tabName)
 	if ActiveTab == tabName then return end; ActiveTab = tabName
+
+	-- Button Aesthetics
 	for _, btn in ipairs(SubButtons) do
 		if btn.Name == tabName .. "Btn" then
 			btn:SetAttribute("IsActive", true); local grad = btn:FindFirstChildOfClass("UIGradient")
@@ -138,12 +142,17 @@ local function SwitchTab(tabName)
 			TweenService:Create(btn, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(180, 180, 180)}):Play()
 		end
 	end
-	for _, child in ipairs(ContentFrame:GetChildren()) do if child:IsA("Frame") or child:IsA("ScrollingFrame") then child.Visible = false end end
+
+	for _, child in ipairs(ContentFrame:GetChildren()) do 
+		if child:IsA("GuiObject") then child.Visible = false end 
+	end
 	if AOT_Interface:FindFirstChild("TradeOverlay") then AOT_Interface.TradeOverlay.Visible = false end
 
-	if player.PlayerGui:FindFirstChild("PvPGui") then 
-		player.PlayerGui.PvPGui.MainFrame.Visible = false 
-	end
+	pcall(function()
+		if player.PlayerGui:FindFirstChild("PvPGui") and player.PlayerGui.PvPGui:FindFirstChild("MainFrame") then 
+			player.PlayerGui.PvPGui.MainFrame.Visible = false 
+		end
+	end)
 
 	if TabModules[tabName] and TabModules[tabName].Show then TabModules[tabName].Show() end
 end
@@ -232,7 +241,6 @@ local function BuildNavigation()
 		catBtn.MouseButton1Click:Connect(CategoryCallbacks[catName])
 	end
 
-	-- [[ THE FIX: Wrap Admin Button inside isAdmin check ]]
 	if isAdmin then
 		local adminBtn = Instance.new("TextButton", NavBar)
 		adminBtn.Name = "AdminBtn"; adminBtn.Size = isMobile and UDim2.new(0, 90, 1, -15) or UDim2.new(1, -15, 0, 45)
@@ -276,7 +284,7 @@ task.spawn(function() local leaderstats = player:WaitForChild("leaderstats", 10)
 
 task.spawn(function()
 	local folderName = isMobile and "MobileModules" or "UIModules"
-	local uiModulesFolder = script.Parent:WaitForChild(folderName, 5) or script.Parent:WaitForChild("UIModules", 5)
+	local uiModulesFolder = script.Parent:WaitForChild(folderName, 5)
 
 	if uiModulesFolder then
 		local rootModules = script.Parent:WaitForChild("UIModules", 5)
@@ -303,10 +311,12 @@ task.spawn(function()
 		TabModules["PVP"].Init(ContentFrame, TooltipManager)
 		TabModules["RaidCombat"] = require(uiModulesFolder:WaitForChild("RaidTab"))
 		TabModules["RaidCombat"].Init(ContentFrame, TooltipManager)
-		TabModules["Prestige"] = require(uiModulesFolder:WaitForChild("PrestigeTab"))
-		TabModules["Prestige"].Init(ContentFrame)
 
-		-- [[ THE FIX: Wrap Admin Tab Require in isAdmin check ]]
+		pcall(function()
+			TabModules["Prestige"] = require(uiModulesFolder:WaitForChild("PrestigeTab"))
+			TabModules["Prestige"].Init(ContentFrame)
+		end)
+
 		if isAdmin then
 			pcall(function()
 				TabModules["Admin"] = require(rootModules:WaitForChild("AdminTab")); TabModules["Admin"].Init(ContentFrame)
