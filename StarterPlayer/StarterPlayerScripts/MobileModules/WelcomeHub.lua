@@ -221,8 +221,20 @@ function WelcomeHub.Init(parentFrame)
 	end
 
 	-- [[ UPDATED CHANGELOG: v1.2.0 ]]
-	CreateSection(HubScroll, "CHANGELOG: v1.2.0 MULTIPLAYER", "<b>The Multiplayer Update is LIVE!</b>\n\n• <b>Multiplayer Raids:</b> Party up with 3 players to take down Titans!\n• <b>Secure Trading:</b> Securely exchange Items and Dews in the Hub.\n• <b>PvP Arena:</b> Battle other players for Elo and leaderboard ranks.\n• <b>Wagering:</b> Spectate PvP matches and bet Dews on the winner!\n• <b>Balance:</b> CC reduction in PvP and Raid death penalties added.", 2)
-	CreateSection(HubScroll, "QUICK SYNERGIES", "Use skills in sequence to trigger devastating <font color='#FFD700'>Synergies</font>!\n\n• <b>Basic Slash</b> -> <b>Spinning Slash</b> -> <b>Nape Strike</b>\n• <b>Dual Slash</b> -> <b>Momentum Strike</b> -> <b>Vortex Slash</b>\n• <b>Armor Piercer</b> -> <b>Spear Volley</b> -> <b>Reckless Barrage</b>", 3)
+	CreateSection(HubScroll, "CHANGELOG: v1.3.0 NIGHTMARE & UI", 
+		"<b>Massive Balance Changes & Flawless Mobile UI!</b>\n\n" ..
+			"• <b>Combat Balance:</b> Boss dodge & crit rates hard-capped. No more RNG one-shots! Armor scaling works properly.\n" ..
+			"• <b>Boss HP Squish:</b> Raid & World Bosses re-balanced for better combat pacing.\n" ..
+			"• <b>Cursed Weapons:</b> Transcendent gear massively buffed. Abyssal Blood drop rates nerfed.\n" ..
+			"• <b>Mobile UI:</b> Trade Hub, Battle Tab, and Prestige Tree perfectly optimized for all mobile screens.\n" ..
+			"• <b>Bug Fixes:</b> Fixed 'Busy' trade lockouts, broken aspect ratios, and UI clipping.", 2)
+
+	-- [[ BRAND NEW ACTIVE CODES SECTION ]]
+	CreateSection(HubScroll, "ACTIVE CODES", 
+		"Click the Menu (Three Lines) -> Settings -> Codes to redeem!\n\n" ..
+			"• <b><font color='#55FF55'>MULTIPLAYERPART2</font></b> - Free Rewards\n" ..
+			"• <b><font color='#55FF55'>NIGHTMAREMODE</font></b> - Free Rewards\n" ..
+			"• <b><font color='#55FF55'>APRILFOOLS</font></b> - Free Rewards", 3)
 
 	local LBContainer = Instance.new("Frame", HubScroll); LBContainer.Size = UDim2.new(0.95, 0, 0, 200); LBContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 25); Instance.new("UICorner", LBContainer).CornerRadius = UDim.new(0, 8); Instance.new("UIStroke", LBContainer).Color = Color3.fromRGB(100, 80, 40); LBContainer.LayoutOrder = 4
 
