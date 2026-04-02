@@ -43,15 +43,16 @@ local function GetTemplate(partData, templateName)
 	return partData.Mobs[1] 
 end
 
+-- Used for standard mobs and endless to allow player progression to feel "overpowered"
 local function GetHPScale(targetPart, prestige)
-	local chapterScale = math.pow(1.30, targetPart - 1) 
-	local prestigeScale = math.pow(1.35, prestige) 
+	local chapterScale = math.pow(1.20, targetPart - 1) 
+	local prestigeScale = math.pow(1.25, prestige) 
 	return chapterScale * prestigeScale
 end
 
 local function GetDmgScale(targetPart, prestige)
-	local chapterScale = math.pow(1.20, targetPart - 1) 
-	local prestigeScale = math.pow(1.25, prestige) 
+	local chapterScale = math.pow(1.15, targetPart - 1) 
+	local prestigeScale = math.pow(1.15, prestige) 
 	return chapterScale * prestigeScale
 end
 
@@ -67,7 +68,7 @@ end
 
 local function ParseAwakenedStats(statString)
 	local stats = { DmgMult = 1.0, DodgeBonus = 0, CritBonus = 0, HpBonus = 0, SpdBonus = 0, GasBonus = 0, HealOnKill = 0, IgnoreArmor = 0 }
-	if not statString then return stats end
+	if not statString or statString == "" then return stats end
 	for stat in string.gmatch(statString, "[^|]+") do
 		stat = stat:match("^%s*(.-)%s*$")
 		if stat:find("DMG") then stats.DmgMult += tonumber(stat:match("%d+")) / 100
@@ -147,6 +148,12 @@ local function StartBattle(player, encounterType, requestedPartId)
 		if not eTemplate then return end
 		logFlavor = "<font color='#FF5555'>[NIGHTMARE HUNT]</font>\n" .. eTemplate.Name .. " approaches!"
 		targetPart = 1 
+
+	elseif encounterType == "EngageRaid" then
+		eTemplate = EnemyData.RaidBosses[requestedPartId]
+		if not eTemplate then return end
+		logFlavor = "<font color='#FF5555'>[RAID BOSS]</font>\n" .. eTemplate.Name .. " blocks your path!"
+		targetPart = 1
 	else
 		targetPart = math.min(8, currentPart)
 		local partData = EnemyData.Parts[targetPart]
@@ -164,9 +171,9 @@ local function StartBattle(player, encounterType, requestedPartId)
 		hpMult *= 1.3; dmgMult *= 1.25; dropMult *= 1.5 
 	elseif isPaths then
 		local floor = player:GetAttribute("PathsFloor") or 1
-		local pathScale = math.pow(1.18, floor - 1) 
-		hpMult = hpMult * pathScale
-		dmgMult = dmgMult * pathScale
+		local pathScale = math.pow(1.10, floor - 1) 
+		hpMult = hpMult * (0.60 * pathScale) 
+		dmgMult = dmgMult * (1.10 * pathScale)
 		dropMult = 1.0 + (prestige * 0.25) + (floor * 0.1)
 	end
 
@@ -182,8 +189,10 @@ local function StartBattle(player, encounterType, requestedPartId)
 	local accBonus = (ItemData.Equipment[accName] and ItemData.Equipment[accName].Bonus) or {}
 
 	local safeWpnName = wpnName:gsub("[^%w]", "")
-	local awakenedString = player:GetAttribute(safeWpnName .. "_Awakened")
-	local awakenedStats = ParseAwakenedStats(awakenedString)
+	local wpnAwakenedString = player:GetAttribute(safeWpnName .. "_Awakened") or ""
+	local pathsAwakenedString = player:GetAttribute("PathsAwakened") or ""
+	local combinedAwakenedString = wpnAwakenedString .. " | " .. pathsAwakenedString
+	local awakenedStats = ParseAwakenedStats(combinedAwakenedString)
 
 	local clanName = player:GetAttribute("Clan") or "None"
 
@@ -214,6 +223,57 @@ local function StartBattle(player, encounterType, requestedPartId)
 	local eStr = math.floor(eTemplate.Strength * dmgMult)
 	local eDef = math.floor(eTemplate.Defense * dmgMult)
 	local eSpd = math.floor(eTemplate.Speed * spdMult)
+
+	-- [[ THE DYNAMIC ENCOUNTER ENGINE ]]
+	-- Overwrites static math with purely dynamic, player-relative ratio math.
+	local isDynamicBoss = (encounterType == "EngageWorldBoss" or encounterType == "EngageNightmare" or encounterType == "EngageRaid")
+
+	if isDynamicBoss then
+		-- Group Multiplier Detection
+		local groupMult = 1
+		if encounterType == "EngageWorldBoss" then
+			groupMult = math.clamp(#Players:GetPlayers(), 1, 15)
+		elseif encounterType == "EngageRaid" then
+			local partyId = player:GetAttribute("PartyID")
+			if partyId then
+				local pCount = 0
+				for _, p in ipairs(Players:GetPlayers()) do
+					if p:GetAttribute("PartyID") == partyId then pCount += 1 end
+				end
+				groupMult = math.clamp(pCount, 1, 4)
+			end
+		end
+
+		-- Base Encounter Type Weights
+		local baseDifficulty = 1.0
+		if encounterType == "EngageWorldBoss" then baseDifficulty = 2.5
+		elseif encounterType == "EngageNightmare" then baseDifficulty = 1.8
+		elseif encounterType == "EngageRaid" then baseDifficulty = 1.2 end
+
+		-- DYNAMIC HP: Boss will always take exactly 15-30 unmitigated hits to kill based on difficulty and group size.
+		local effectivePlayerDmg = math.max(10, pTotalStr * (awakenedStats.DmgMult or 1.0) * (1 + (prestige * 0.15)))
+		local bossHPRatio = math.clamp(eTemplate.Health / 5000, 0.5, 10.0)
+		eHP = math.floor(effectivePlayerDmg * 15 * baseDifficulty * groupMult * bossHPRatio)
+
+		if eGateType == "Steam" then
+			eGateHP = eTemplate.GateHP -- Fixed hit count limit
+		elseif eGateType then
+			local gateRatio = (eTemplate.GateHP or 0) / eTemplate.Health
+			eGateHP = math.floor(eHP * gateRatio)
+		end
+
+		-- DYNAMIC LETHALITY: Boss will always kill you in ~6-8 hits if you don't mitigate/dodge.
+		local effectivePlayerDurability = pMaxHP + (pTotalDef * 3)
+		local bossDmgRatio = math.clamp(eTemplate.Strength / 200, 0.5, 4.0)
+		eStr = math.floor((effectivePlayerDurability / 6) * baseDifficulty * bossDmgRatio)
+
+		-- DYNAMIC STATS: Prevent defensive walls from dropping boss hit chance to 0%.
+		local bossDefRatio = math.clamp(eTemplate.Defense / 100, 0.5, 4.0)
+		eDef = math.floor(pTotalStr * 0.8 * bossDefRatio * baseDifficulty)
+		eSpd = math.floor(pTotalSpd * 1.1)
+
+		logFlavor = logFlavor .. "\n<font color='#AAAAAA'>[Dynamic Encounter: Boss attuned to Group Size " .. groupMult .. "x]</font>"
+	end
 
 	local enemyAwakenedStats = nil
 	if isPaths then
@@ -290,16 +350,11 @@ local function ProcessEnemyDeath(player, battle)
 		if vpEvent then vpEvent:Fire(player, 250) end
 	end
 
-	-- [[ THE FIX: Award Achievements for Cosmetic Unlocks! ]]
 	if battle.Context.IsNightmare then
 		if string.find(battle.Enemy.Name, "Frenzied Beast") then
-			if not player:GetAttribute("Ach_Defeat_Frenzied") then
-				player:SetAttribute("Ach_Defeat_Frenzied", true)
-			end
+			if not player:GetAttribute("Ach_Defeat_Frenzied") then player:SetAttribute("Ach_Defeat_Frenzied", true) end
 		elseif string.find(battle.Enemy.Name, "Abyssal Armored") then
-			if not player:GetAttribute("Ach_Defeat_Abyssal") then
-				player:SetAttribute("Ach_Defeat_Abyssal", true)
-			end
+			if not player:GetAttribute("Ach_Defeat_Abyssal") then player:SetAttribute("Ach_Defeat_Abyssal", true) end
 		end
 	end
 
@@ -345,9 +400,9 @@ local function ProcessEnemyDeath(player, battle)
 		local maxMemoryIndex = math.min(#EnemyData.PathsMemories, math.max(1, math.ceil((floor + 1) / 3)))
 		local nextEnemyTemplate = EnemyData.PathsMemories[math.random(1, maxMemoryIndex)]
 
-		local pathScale = math.pow(1.18, floor)
-		local hpMult = GetHPScale(1, prestige) * pathScale
-		local dmgMult = GetDmgScale(1, prestige) * pathScale
+		local pathScale = math.pow(1.10, floor)
+		local hpMult = GetHPScale(1, prestige) * (0.60 * pathScale)
+		local dmgMult = GetDmgScale(1, prestige) * (1.10 * pathScale)
 		local spdMult = GetSpdScale(1, prestige)
 		local dropMult = 1.0 + (prestige * 0.25) + ((floor + 1) * 0.1)
 
