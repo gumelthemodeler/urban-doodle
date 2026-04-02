@@ -4,10 +4,10 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GameData = require(ReplicatedStorage:WaitForChild("GameData"))
 local AdminManager = require(ReplicatedStorage:WaitForChild("AdminManager"))
+local CosmeticData = require(ReplicatedStorage:WaitForChild("CosmeticData"))
 local Network = ReplicatedStorage:WaitForChild("Network")
 local NotificationEvent = Network:WaitForChild("NotificationEvent")
 
--- [[ RESTORED: ADMIN COMMANDS ]]
 local AdminCommand = Network:FindFirstChild("AdminCommand") or Instance.new("RemoteEvent", Network)
 AdminCommand.Name = "AdminCommand"
 
@@ -51,7 +51,39 @@ AdminCommand.OnServerEvent:Connect(function(player, command, targetStr, args)
 	end
 end)
 
--- [[ TRAINING & STATS ]]
+local EquipCosmetic = Network:FindFirstChild("EquipCosmetic") or Instance.new("RemoteEvent", Network)
+EquipCosmetic.Name = "EquipCosmetic"
+
+-- [[ THE FIX: Fast-Click Debounce Table ]]
+local equipDebounce = {}
+
+EquipCosmetic.OnServerEvent:Connect(function(player, typeKey, itemKey)
+	-- Blocks rapid double-clicks (like touch-screen bouncing)
+	if equipDebounce[player.UserId] then return end
+	equipDebounce[player.UserId] = true
+
+	local dataPool = typeKey == "Title" and CosmeticData.Titles or CosmeticData.Auras
+	local cData = dataPool[itemKey]
+
+	-- [[ THE FIX: "Already Equipped" Blocker ]]
+	-- If the server sees you already wear it, it drops the request instantly so no duplicate UI notifications send
+	local currentEquipped = player:GetAttribute("Equipped" .. typeKey) or (typeKey == "Title" and "Cadet" or "None")
+
+	if currentEquipped ~= itemKey then
+		if cData and CosmeticData.CheckUnlock(player, cData.ReqType, cData.ReqValue) then
+			player:SetAttribute("Equipped" .. typeKey, itemKey)
+			NotificationEvent:FireClient(player, "Equipped " .. cData.Name .. "!", "Success")
+		else
+			NotificationEvent:FireClient(player, "Failed to equip cosmetic.", "Error")
+		end
+	end
+
+	-- Clear the debounce after a very brief delay
+	task.delay(0.25, function()
+		equipDebounce[player.UserId] = nil
+	end)
+end)
+
 Network:WaitForChild("TrainAction").OnServerEvent:Connect(function(player, combo, isTitan)
 	combo = tonumber(combo) or 0
 	combo = math.clamp(combo, 0, 150)
@@ -64,7 +96,6 @@ Network:WaitForChild("TrainAction").OnServerEvent:Connect(function(player, combo
 end)
 
 Network:WaitForChild("UpgradeStat").OnServerEvent:Connect(function(player, statName, amount)
-	-- [[ FIX: Added Health and Gas to valid upgrades ]]
 	local validStats = {
 		["Health"]=true, ["Gas"]=true, ["Strength"]=true, ["Defense"]=true, ["Speed"]=true, ["Resolve"]=true, 
 		["Titan_Power_Val"]=true, ["Titan_Speed_Val"]=true, ["Titan_Hardening_Val"]=true, 
