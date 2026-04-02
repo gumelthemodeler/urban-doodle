@@ -55,6 +55,7 @@ end
 
 local function ApplyButtonGradient(btn, topColor, botColor, strokeColor)
 	btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	btn.AutoButtonColor = false 
 	local grad = btn:FindFirstChildOfClass("UIGradient") or Instance.new("UIGradient", btn)
 	grad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, topColor), ColorSequenceKeypoint.new(1, botColor)}; grad.Rotation = 90
 	local corner = btn:FindFirstChildOfClass("UICorner") or Instance.new("UICorner", btn); corner.CornerRadius = UDim.new(0, 4)
@@ -471,18 +472,28 @@ function ForgeTab.Init(parentFrame, tooltipMgr)
 		if selectedFusionBase and selectedFusionSacrifice then 
 			local baseTitan = player:GetAttribute(selectedFusionBase == "Equipped" and "Titan" or ("Titan_Slot" .. selectedFusionBase)) or "None"
 			local sacTitan = player:GetAttribute(selectedFusionSacrifice == "Equipped" and "Titan" or ("Titan_Slot" .. selectedFusionSacrifice)) or "None"
+			expectedFusionResult = FusionRecipes[baseTitan] and FusionRecipes[baseTitan][sacTitan]
 			Network:WaitForChild("FuseTitan"):FireServer(selectedFusionBase, selectedFusionSacrifice)
 			selectedFusionBase = nil; selectedFusionSacrifice = nil; fusionState = "Base"
 		end
 	end)
 
-	local FusVaultPanel = Instance.new("Frame", SubTabs["Fusion"])
+	FusVaultPanel = Instance.new("Frame", SubTabs["Fusion"])
 	FusVaultPanel.Size = UDim2.new(0.95, 0, 0, 0); FusVaultPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 25); FusVaultPanel.LayoutOrder = 2
 	Instance.new("UICorner", FusVaultPanel).CornerRadius = UDim.new(0, 8); Instance.new("UIStroke", FusVaultPanel).Color = Color3.fromRGB(80, 80, 90)
 
-	-- [[ FIX: Added explicit step tracking text ]]
 	FusionInstructionLbl = Instance.new("TextLabel", FusVaultPanel)
 	FusionInstructionLbl.Size = UDim2.new(1, 0, 0, 30); FusionInstructionLbl.Position = UDim2.new(0, 0, 0, 5); FusionInstructionLbl.BackgroundTransparency = 1; FusionInstructionLbl.Font = Enum.Font.GothamBlack; FusionInstructionLbl.TextColor3 = Color3.fromRGB(255, 215, 100); FusionInstructionLbl.TextSize = 14; FusionInstructionLbl.Text = "STEP 1: SELECT BASE TITAN TO UPGRADE"
+
+	VaultList = Instance.new("Frame", FusVaultPanel)
+	VaultList.Size = UDim2.new(1, -10, 0, 0); VaultList.Position = UDim2.new(0, 5, 0, 35); VaultList.BackgroundTransparency = 1
+	local vLayout = Instance.new("UIGridLayout", VaultList); vLayout.CellSize = UDim2.new(0.48, 0, 0, 50); vLayout.CellPadding = UDim2.new(0.04, 0, 0, 10); vLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; vLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+	vLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() 
+		VaultList.Size = UDim2.new(1, -10, 0, vLayout.AbsoluteContentSize.Y)
+		FusVaultPanel.Size = UDim2.new(0.95, 0, 0, 45 + vLayout.AbsoluteContentSize.Y)
+		SubTabs["Fusion"].CanvasSize = UDim2.new(0, 0, 0, 180 + 45 + vLayout.AbsoluteContentSize.Y + 40)
+	end)
 
 	local function UpdateFusBoxVisuals()
 		local baseColor = (fusionState == "Base") and Color3.fromRGB(255, 215, 100) or Color3.fromRGB(60, 60, 70)
@@ -502,16 +513,6 @@ function ForgeTab.Init(parentFrame, tooltipMgr)
 
 	fusBaseBox.MouseButton1Click:Connect(function() fusionState = "Base"; UpdateFusBoxVisuals() end)
 	fusSacBox.MouseButton1Click:Connect(function() fusionState = "Sacrifice"; UpdateFusBoxVisuals() end)
-
-	VaultList = Instance.new("Frame", FusVaultPanel)
-	VaultList.Size = UDim2.new(1, -10, 0, 0); VaultList.Position = UDim2.new(0, 5, 0, 35); VaultList.BackgroundTransparency = 1
-	local vLayout = Instance.new("UIGridLayout", VaultList); vLayout.CellSize = UDim2.new(0.48, 0, 0, 50); vLayout.CellPadding = UDim2.new(0.04, 0, 0, 10); vLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; vLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-	vLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() 
-		VaultList.Size = UDim2.new(1, -10, 0, vLayout.AbsoluteContentSize.Y)
-		FusVaultPanel.Size = UDim2.new(0.95, 0, 0, 45 + vLayout.AbsoluteContentSize.Y)
-		SubTabs["Fusion"].CanvasSize = UDim2.new(0, 0, 0, 180 + 45 + vLayout.AbsoluteContentSize.Y + 40)
-	end)
 
 	local function RenderFusion()
 		UpdateFusBoxVisuals()
@@ -634,7 +635,7 @@ function ForgeTab.Init(parentFrame, tooltipMgr)
 	-- [[ GLOBAL REFRESH LOGIC ]]
 	-- ==========================================
 	player.AttributeChanged:Connect(function(attr)
-		-- [[ FIX: Check Vault Slots as well as Equipped Slot for Fusion Cinematic ]]
+		-- [[ FIX: Added string.match so Vault Slot fusions trigger the cinematic correctly on Mobile too! ]]
 		if (attr == "Titan" or string.match(attr, "^Titan_Slot")) and expectedFusionResult then
 			local newTitan = player:GetAttribute(attr)
 			if newTitan == expectedFusionResult then
