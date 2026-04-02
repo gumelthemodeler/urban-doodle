@@ -92,9 +92,9 @@ local function CreateStatCard(parent, title, valueStr, themeColorHex)
 	return card
 end
 
--- Safely maps the Y scale to prevent title overlap
+-- [[ FIX: Relaxed the scale buffer to allow the nodes to breathe vertically ]]
 local function GetSafeYScale(originalYScale)
-	return (originalYScale * 0.75) + 0.15
+	return (originalYScale * 0.85) + 0.05
 end
 
 function PrestigeTab.Init(parentFrame)
@@ -108,10 +108,11 @@ function PrestigeTab.Init(parentFrame)
 	PointsLabel = Instance.new("TextLabel", MainFrame)
 	PointsLabel.Size = UDim2.new(1, 0, 0, 20); PointsLabel.Position = UDim2.new(0, 0, 0, 35); PointsLabel.BackgroundTransparency = 1; PointsLabel.Font = Enum.Font.GothamBold; PointsLabel.TextColor3 = Color3.fromRGB(150, 255, 150); PointsLabel.TextSize = 14; PointsLabel.Text = "AVAILABLE POINTS: 0"
 
+	-- [[ FIX: Maximize visible area and drastically increase internal CanvasSize (from 750 -> 1100) ]]
 	local TreeScroll = Instance.new("ScrollingFrame", MainFrame)
-	TreeScroll.Size = UDim2.new(1, 0, 1, -230); TreeScroll.Position = UDim2.new(0, 0, 0, 60); TreeScroll.BackgroundColor3 = Color3.fromRGB(12, 12, 15); TreeScroll.ScrollBarThickness = 0; TreeScroll.BorderSizePixel = 0
+	TreeScroll.Size = UDim2.new(1, 0, 1, -235); TreeScroll.Position = UDim2.new(0, 0, 0, 60); TreeScroll.BackgroundColor3 = Color3.fromRGB(12, 12, 15); TreeScroll.ScrollBarThickness = 0; TreeScroll.BorderSizePixel = 0
 	Instance.new("UICorner", TreeScroll).CornerRadius = UDim.new(0, 8); Instance.new("UIStroke", TreeScroll).Color = Color3.fromRGB(40, 40, 50)
-	TreeScroll.CanvasSize = UDim2.new(0, 0, 0, 750) 
+	TreeScroll.CanvasSize = UDim2.new(0, 0, 0, 1100) 
 
 	-- [[ DRAW BRANCH BACKDROPS ]]
 	local function CreateBranchBackdrop(name, xPos, colorHex)
