@@ -1,4 +1,7 @@
 -- @ScriptType: ModuleScript
+
+-- @ScriptType: ModuleScript
+-- @ScriptType: ModuleScript
 local LoginData = {
 	[1] = { Type = "Dews", Amount = 1000 },
 	[2] = { Type = "Item", Name = "Cadet Training Blade", Amount = 1 },
