@@ -6,7 +6,7 @@ local EnemyData = require(ReplicatedStorage:WaitForChild("EnemyData"))
 local ItemData = require(ReplicatedStorage:WaitForChild("ItemData"))
 local SkillData = require(ReplicatedStorage:WaitForChild("SkillData"))
 local CombatCore = require(script.Parent:WaitForChild("CombatCore"))
-local LootManager = require(script.Parent:WaitForChild("LootManager"))
+local LootManager = require(script.Parent:WaitForChild("LootManager")) 
 
 local Network = ReplicatedStorage:FindFirstChild("Network") or Instance.new("Folder", ReplicatedStorage)
 Network.Name = "Network"
@@ -43,12 +43,20 @@ local function GetTemplate(partData, templateName)
 	return partData.Mobs[1] 
 end
 
--- [[ FIX: Massively nerfed scaling multipliers. No more infinite bullet sponges. ]]
 local function GetHPScale(targetPart, prestige)
-	return 1.0 + (targetPart * 0.15) + (prestige * 0.4) 
+	local chapterScale = math.pow(1.30, targetPart - 1) 
+	local prestigeScale = math.pow(1.35, prestige) 
+	return chapterScale * prestigeScale
 end
+
 local function GetDmgScale(targetPart, prestige)
-	return 1.0 + (targetPart * 0.1) + (prestige * 0.3) 
+	local chapterScale = math.pow(1.20, targetPart - 1) 
+	local prestigeScale = math.pow(1.25, prestige) 
+	return chapterScale * prestigeScale
+end
+
+local function GetSpdScale(targetPart, prestige)
+	return 1.0 + (math.pow(targetPart, 0.5) * 0.1) + (math.pow(prestige, 0.6) * 0.2)
 end
 
 local function GetActualStyle(plr)
@@ -149,16 +157,17 @@ local function StartBattle(player, encounterType, requestedPartId)
 
 	local hpMult = GetHPScale(targetPart, prestige)
 	local dmgMult = GetDmgScale(targetPart, prestige)
-	local dropMult = 1.0 + (targetPart * 0.3) + (prestige * 0.5)
+	local spdMult = GetSpdScale(targetPart, prestige)
+	local dropMult = 1.0 + (targetPart * 0.1) + (prestige * 0.25)
 
 	if isEndless then 
-		hpMult *= 1.4; dmgMult *= 1.4; dropMult *= 1.5 
+		hpMult *= 1.3; dmgMult *= 1.25; dropMult *= 1.5 
 	elseif isPaths then
 		local floor = player:GetAttribute("PathsFloor") or 1
-		local pathScale = 0.35 * math.pow(1.20, floor - 1) 
+		local pathScale = math.pow(1.18, floor - 1) 
 		hpMult = hpMult * pathScale
 		dmgMult = dmgMult * pathScale
-		dropMult = 1.0 + (prestige * 0.5) + (floor * 0.15)
+		dropMult = 1.0 + (prestige * 0.25) + (floor * 0.1)
 	end
 
 	local baseDropXP = eTemplate.Drops and eTemplate.Drops.XP or 15
@@ -204,7 +213,7 @@ local function StartBattle(player, encounterType, requestedPartId)
 	local eGateHP = math.floor((eTemplate.GateHP or 0) * (eGateType == "Steam" and 1 or hpMult))
 	local eStr = math.floor(eTemplate.Strength * dmgMult)
 	local eDef = math.floor(eTemplate.Defense * dmgMult)
-	local eSpd = math.floor(eTemplate.Speed * dmgMult)
+	local eSpd = math.floor(eTemplate.Speed * spdMult)
 
 	local enemyAwakenedStats = nil
 	if isPaths then
@@ -215,13 +224,13 @@ local function StartBattle(player, encounterType, requestedPartId)
 			eGateType = "Reinforced Skin"; eGateHP = math.floor(eHP * 0.3)
 			logFlavor = logFlavor .. "\n<font color='#AAAAAA'>[MUTATOR: ARMORED] Target has extreme hardening!</font>"
 		elseif selectedMutator == "Frenzied" then
-			eSpd = eSpd * 2.0; eStr = eStr * 1.2
+			eSpd = eSpd * 1.5; eStr = eStr * 1.2
 			logFlavor = logFlavor .. "\n<font color='#FF5555'>[MUTATOR: FRENZIED] Target is moving at terrifying speeds!</font>"
 		elseif selectedMutator == "Elusive" then
 			enemyAwakenedStats = { DodgeBonus = 15 }
 			logFlavor = logFlavor .. "\n<font color='#55FF55'>[MUTATOR: ELUSIVE] Target is incredibly hard to hit!</font>"
 		elseif selectedMutator == "Colossal" then
-			eHP = eHP * 2.0; eStr = eStr * 1.5; eSpd = math.floor(eSpd * 0.5)
+			eHP = eHP * 1.5; eStr = eStr * 1.5; eSpd = math.floor(eSpd * 0.5)
 			logFlavor = logFlavor .. "\n<font color='#FFAA00'>[MUTATOR: COLOSSAL] Target is massive and deals lethal damage!</font>"
 		end
 	end
@@ -281,6 +290,19 @@ local function ProcessEnemyDeath(player, battle)
 		if vpEvent then vpEvent:Fire(player, 250) end
 	end
 
+	-- [[ THE FIX: Award Achievements for Cosmetic Unlocks! ]]
+	if battle.Context.IsNightmare then
+		if string.find(battle.Enemy.Name, "Frenzied Beast") then
+			if not player:GetAttribute("Ach_Defeat_Frenzied") then
+				player:SetAttribute("Ach_Defeat_Frenzied", true)
+			end
+		elseif string.find(battle.Enemy.Name, "Abyssal Armored") then
+			if not player:GetAttribute("Ach_Defeat_Abyssal") then
+				player:SetAttribute("Ach_Defeat_Abyssal", true)
+			end
+		end
+	end
+
 	local xpGain = battle.Enemy.Drops.XP; local dewsGain = battle.Enemy.Drops.Dews
 	if player:GetAttribute("HasDoubleXP") then xpGain *= 2; dewsGain *= 2 end
 	if player:GetAttribute("Buff_XP_Expiry") and os.time() < player:GetAttribute("Buff_XP_Expiry") then xpGain *= 2 end
@@ -323,17 +345,18 @@ local function ProcessEnemyDeath(player, battle)
 		local maxMemoryIndex = math.min(#EnemyData.PathsMemories, math.max(1, math.ceil((floor + 1) / 3)))
 		local nextEnemyTemplate = EnemyData.PathsMemories[math.random(1, maxMemoryIndex)]
 
-		local pathScale = 0.35 * math.pow(1.20, floor)
+		local pathScale = math.pow(1.18, floor)
 		local hpMult = GetHPScale(1, prestige) * pathScale
 		local dmgMult = GetDmgScale(1, prestige) * pathScale
-		local dropMult = 1.0 + (prestige * 0.5) + ((floor + 1) * 0.15)
+		local spdMult = GetSpdScale(1, prestige)
+		local dropMult = 1.0 + (prestige * 0.25) + ((floor + 1) * 0.1)
 
 		local eHP = math.floor(nextEnemyTemplate.Health * hpMult)
 		local eGateType = nextEnemyTemplate.GateType
 		local eGateHP = math.floor((nextEnemyTemplate.GateHP or 0) * (eGateType == "Steam" and 1 or hpMult))
 		local eStr = math.floor(nextEnemyTemplate.Strength * dmgMult)
 		local eDef = math.floor(nextEnemyTemplate.Defense * dmgMult)
-		local eSpd = math.floor(nextEnemyTemplate.Speed * dmgMult)
+		local eSpd = math.floor(nextEnemyTemplate.Speed * spdMult)
 
 		local enemyAwakenedStats = nil
 		local mutators = {"Armored", "Frenzied", "Elusive", "Colossal"}
@@ -344,13 +367,13 @@ local function ProcessEnemyDeath(player, battle)
 			eGateType = "Reinforced Skin"; eGateHP = math.floor(eHP * 0.3)
 			logFlavor = logFlavor .. "\n<font color='#AAAAAA'>[MUTATOR: ARMORED] Target has extreme hardening!</font>"
 		elseif selectedMutator == "Frenzied" then
-			eSpd = eSpd * 2.0; eStr = eStr * 1.2
+			eSpd = eSpd * 1.5; eStr = eStr * 1.2
 			logFlavor = logFlavor .. "\n<font color='#FF5555'>[MUTATOR: FRENZIED] Target is moving at terrifying speeds!</font>"
 		elseif selectedMutator == "Elusive" then
 			enemyAwakenedStats = { DodgeBonus = 15 }
 			logFlavor = logFlavor .. "\n<font color='#55FF55'>[MUTATOR: ELUSIVE] Target is incredibly hard to hit!</font>"
 		elseif selectedMutator == "Colossal" then
-			eHP = eHP * 2.0; eStr = eStr * 1.5; eSpd = math.floor(eSpd * 0.5)
+			eHP = eHP * 1.5; eStr = eStr * 1.5; eSpd = math.floor(eSpd * 0.5)
 			logFlavor = logFlavor .. "\n<font color='#FFAA00'>[MUTATOR: COLOSSAL] Target is massive and deals lethal damage!</font>"
 		end
 
@@ -386,16 +409,17 @@ local function ProcessEnemyDeath(player, battle)
 		local partData = EnemyData.Parts[targetPart]
 		local nextEnemyTemplate = partData.Mobs[math.random(1, #partData.Mobs)]
 
-		local hpMult = GetHPScale(targetPart, prestige) * 1.4
-		local dmgMult = GetDmgScale(targetPart, prestige) * 1.4
-		local dropMult = (1.0 + (targetPart * 0.3) + (prestige * 0.5)) * 1.5
+		local hpMult = GetHPScale(targetPart, prestige) * 1.3
+		local dmgMult = GetDmgScale(targetPart, prestige) * 1.25
+		local spdMult = GetSpdScale(targetPart, prestige)
+		local dropMult = (1.0 + (targetPart * 0.1) + (prestige * 0.25)) * 1.5
 
 		local eHP = math.floor(nextEnemyTemplate.Health * hpMult)
 		local eGateType = nextEnemyTemplate.GateType
 		local eGateHP = math.floor((nextEnemyTemplate.GateHP or 0) * (eGateType == "Steam" and 1 or hpMult))
 		local eStr = math.floor(nextEnemyTemplate.Strength * dmgMult)
 		local eDef = math.floor(nextEnemyTemplate.Defense * dmgMult)
-		local eSpd = math.floor(nextEnemyTemplate.Speed * dmgMult)
+		local eSpd = math.floor(nextEnemyTemplate.Speed * spdMult)
 
 		local logFlavor = "<font color='#AA55FF'>[ENDLESS EXPEDITION - WAVE " .. nextWave .. "]</font>\nYou encounter a " .. nextEnemyTemplate.Name .. "!"
 
@@ -442,13 +466,14 @@ local function ProcessEnemyDeath(player, battle)
 		local prestige = player.leaderstats.Prestige.Value
 		local hpMult = GetHPScale(battle.Context.TargetPart, prestige)
 		local dmgMult = GetDmgScale(battle.Context.TargetPart, prestige)
+		local spdMult = GetSpdScale(battle.Context.TargetPart, prestige)
 
 		local currentPart = battle.Context.TargetPart
 		local partData = EnemyData.Parts[currentPart]
 		local waveData = battle.Context.MissionData.Waves[battle.Context.CurrentWave]
 		local nextEnemyTemplate = GetTemplate(partData, waveData.Template)
 
-		local dropMult = 1.0 + (battle.Context.TargetPart * 0.3) + (prestige * 0.5)
+		local dropMult = 1.0 + (battle.Context.TargetPart * 0.1) + (prestige * 0.25)
 		local nextBaseDropXP = nextEnemyTemplate.Drops and nextEnemyTemplate.Drops.XP or 15
 		local nextBaseDropDews = nextEnemyTemplate.Drops and nextEnemyTemplate.Drops.Dews or 10
 		local nextFinalDropXP = math.floor(nextBaseDropXP * dropMult)
@@ -467,7 +492,7 @@ local function ProcessEnemyDeath(player, battle)
 			IsMinigame = nextEnemyTemplate.IsMinigame, IsPlayer = false, Name = nextEnemyTemplate.Name, IsHuman = nextEnemyTemplate.IsHuman or false, IsNightmare = false,
 			HP = math.floor(nextEnemyTemplate.Health * hpMult), MaxHP = math.floor(nextEnemyTemplate.Health * hpMult),
 			GateType = nextEnemyTemplate.GateType, GateHP = math.floor((nextEnemyTemplate.GateHP or 0) * (nextEnemyTemplate.GateType == "Steam" and 1 or hpMult)), MaxGateHP = math.floor((nextEnemyTemplate.GateHP or 0) * (nextEnemyTemplate.GateType == "Steam" and 1 or hpMult)),
-			TotalStrength = math.floor(nextEnemyTemplate.Strength * dmgMult), TotalDefense = math.floor(nextEnemyTemplate.Defense * dmgMult), TotalSpeed = math.floor(nextEnemyTemplate.Speed * dmgMult),
+			TotalStrength = math.floor(nextEnemyTemplate.Strength * dmgMult), TotalDefense = math.floor(nextEnemyTemplate.Defense * dmgMult), TotalSpeed = math.floor(nextEnemyTemplate.Speed * spdMult),
 			Statuses = {}, Cooldowns = {}, Skills = nextEnemyTemplate.Skills or {"Brutal Swipe"},
 			Drops = { XP = nextFinalDropXP, Dews = nextFinalDropDews, ItemChance = nextEnemyTemplate.Drops and nextEnemyTemplate.Drops.ItemChance or {} },
 			LastSkill = "None"
@@ -751,7 +776,7 @@ CombatAction.OnServerEvent:Connect(function(player, actionType, actionData)
 				battle.Enemy.MaxGateHP = 0
 				battle.Enemy.TotalStrength = math.floor(50 * dmgMult)
 				battle.Enemy.TotalDefense = math.floor(20 * dmgMult)
-				battle.Enemy.TotalSpeed = math.floor(15 * dmgMult)
+				battle.Enemy.TotalSpeed = math.floor(15 * GetSpdScale(5, pPrestige))
 				battle.Enemy.Skills = {"Brutal Swipe", "Titan Grab", "Titan Bite"}
 				battle.Enemy.Statuses = {}
 				battle.Enemy.Cooldowns = {}
