@@ -24,6 +24,7 @@ local selectedWeapon = nil
 local fusionState = "Base"
 local selectedFusionBase = nil
 local selectedFusionSacrifice = nil
+local expectedFusionResult = nil
 
 local craftBtn, FormulaArea
 local rightPanelName, rightPanelStats, awakenBtn, extractCountLbl
@@ -32,14 +33,15 @@ local fusBaseBox, fusSacBox, fusResBox
 local fuseBtn
 local RecipeList, CraftInvGrid
 local VaultList
+local FusionInstructionLbl
 
 local RarityColors = { ["Common"] = "#AAAAAA", ["Uncommon"] = "#55FF55", ["Rare"] = "#5588FF", ["Epic"] = "#CC44FF", ["Legendary"] = "#FFD700", ["Mythical"] = "#FF3333", ["Transcendent"] = "#FF55FF" }
 local RarityOrder = { Transcendent = 0, Mythical = 1, Legendary = 2, Epic = 3, Rare = 4, Uncommon = 5, Common = 6 }
 
 local FusionRecipes = { 
 	["Female Titan"] = { ["Founding Titan"] = "Founding Female Titan" }, 
-	["Founding Titan"] = { ["Female Titan"] = "Founding Female Titan" }, 
-	["Attack Titan"] = { ["Armored Titan"] = "Armored Attack Titan", ["War Hammer Titan"] = "War Hammer Attack Titan" }, 
+	["Founding Titan"] = { ["Female Titan"] = "Founding Female Titan", ["Attack Titan"] = "Founding Attack Titan" }, 
+	["Attack Titan"] = { ["Armored Titan"] = "Armored Attack Titan", ["War Hammer Titan"] = "War Hammer Attack Titan", ["Founding Titan"] = "Founding Attack Titan" }, 
 	["Armored Titan"] = { ["Attack Titan"] = "Armored Attack Titan" }, 
 	["War Hammer Titan"] = { ["Attack Titan"] = "War Hammer Attack Titan" }, 
 	["Colossal Titan"] = { ["Jaw Titan"] = "Colossal Jaw Titan" }, 
@@ -329,13 +331,18 @@ function ForgeTab.Init(parentFrame, tooltipMgr)
 				local countTag = Instance.new("TextLabel", countBadge); countTag.Size = UDim2.new(1, 0, 1, 0); countTag.BackgroundTransparency = 1; countTag.Font = Enum.Font.GothamBlack; countTag.TextColor3 = Color3.fromRGB(210, 210, 210); countTag.TextSize = 8; countTag.Text = "x" .. count; countTag.ZIndex = 4
 
 				local nameLbl = Instance.new("TextLabel", card); nameLbl.Size = UDim2.new(0.88, 0, 0.5, 0); nameLbl.Position = UDim2.new(0.5, 0, 0.5, 2); nameLbl.AnchorPoint = Vector2.new(0.5, 0.5); nameLbl.BackgroundTransparency = 1; nameLbl.Font = Enum.Font.GothamBold; nameLbl.TextColor3 = Color3.fromRGB(235, 235, 235); nameLbl.TextScaled = true; nameLbl.TextWrapped = true; nameLbl.Text = item.Name; nameLbl.ZIndex = 3
-				local tConstraint = Instance.new("UITextSizeConstraint", nameLbl); tConstraint.MaxTextSize = 10; tConstraint.MinTextSize = 6
+				local tConstraint = Instance.new("UITextSizeConstraint", nameLbl); tConstraint.MaxTextSize = 11; tConstraint.MinTextSize = 7
 
-				local rarityTag = Instance.new("TextLabel", card); rarityTag.Size = UDim2.new(0, 14, 0, 14); rarityTag.Position = UDim2.new(0, 4, 1, -18); rarityTag.BackgroundTransparency = 1; rarityTag.Font = Enum.Font.GothamBlack; rarityTag.TextColor3 = rarityRGB; rarityTag.TextTransparency = 0.3; rarityTag.TextSize = 9; rarityTag.Text = string.sub(rKey, 1, 1); rarityTag.ZIndex = 3
+				local rarityTag = Instance.new("TextLabel", card); rarityTag.Size = UDim2.new(0, 16, 0, 16); rarityTag.Position = UDim2.new(0, 6, 1, -22); rarityTag.BackgroundTransparency = 1; rarityTag.Font = Enum.Font.GothamBlack; rarityTag.TextColor3 = rarityRGB; rarityTag.TextTransparency = 0.3; rarityTag.TextSize = 11; rarityTag.Text = string.sub(rKey, 1, 1); rarityTag.ZIndex = 3
 
 				local tTipStr = "<b><font color='" .. cColor .. "'>[" .. rKey .. "] " .. item.Name .. "</font></b>"
-				if item.Data.Bonus then for k, v in pairs(item.Data.Bonus) do tTipStr ..= "\n<font color='#55FF55'>+" .. v .. " " .. k:sub(1,3):upper() .. "</font>" end end
-				if awakened then tTipStr ..= "\n<font color='#AA55FF'>[AWAKENED]:\n" .. awakened .. "</font>" end
+				if item.Data.Bonus then 
+					local bList = {}; for k, v in pairs(item.Data.Bonus) do table.insert(bList, "+" .. v .. " " .. string.sub(k, 1, 3):upper()) end; 
+					tTipStr = tTipStr .. "\n<font color='#55FF55'>" .. table.concat(bList, "\n") .. "</font>" 
+				elseif item.Data.Desc then 
+					tTipStr = tTipStr .. "\n<font color='#AAAAAA'>" .. item.Data.Desc .. "</font>" 
+				end
+				if awakened then tTipStr = tTipStr .. "\n<font color='#AA55FF'>[Awakened]:\n" .. awakened .. "</font>" end
 
 				local btnCover = Instance.new("TextButton", card); btnCover.Size = UDim2.new(1,0,1,0); btnCover.BackgroundTransparency = 1; btnCover.Text = ""; btnCover.ZIndex = 5
 				btnCover.MouseEnter:Connect(function() if cachedTooltipMgr then cachedTooltipMgr.Show(tTipStr) end end)
@@ -452,17 +459,6 @@ function ForgeTab.Init(parentFrame, tooltipMgr)
 	fusResBox, _, _, _, _, _ = CreateStationSquare(FusEqArea, "#FFFFFF", false, 5)
 	fusResBox.BackgroundColor3 = Color3.fromRGB(35, 30, 30)
 
-	local function UpdateFusBoxVisuals()
-		local baseColor = (fusionState == "Base") and Color3.fromRGB(255, 215, 100) or Color3.fromRGB(60, 60, 70)
-		local sacColor = (fusionState == "Sacrifice") and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(60, 60, 70)
-
-		fusBaseBox:FindFirstChildOfClass("UIStroke").Color = baseColor
-		fusSacBox:FindFirstChildOfClass("UIStroke").Color = sacColor
-	end
-
-	fusBaseBox.MouseButton1Click:Connect(function() fusionState = "Base"; UpdateFusBoxVisuals() end)
-	fusSacBox.MouseButton1Click:Connect(function() fusionState = "Sacrifice"; UpdateFusBoxVisuals() end)
-
 	local ActionArea = Instance.new("Frame", FusTopPanel)
 	ActionArea.Size = UDim2.new(1, 0, 0, 45); ActionArea.Position = UDim2.new(0, 0, 1, -55); ActionArea.BackgroundTransparency = 1
 	local aaLayout = Instance.new("UIListLayout", ActionArea); aaLayout.FillDirection = Enum.FillDirection.Horizontal; aaLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; aaLayout.VerticalAlignment = Enum.VerticalAlignment.Center; aaLayout.Padding = UDim.new(0, 20)
@@ -475,7 +471,6 @@ function ForgeTab.Init(parentFrame, tooltipMgr)
 		if selectedFusionBase and selectedFusionSacrifice then 
 			local baseTitan = player:GetAttribute(selectedFusionBase == "Equipped" and "Titan" or ("Titan_Slot" .. selectedFusionBase)) or "None"
 			local sacTitan = player:GetAttribute(selectedFusionSacrifice == "Equipped" and "Titan" or ("Titan_Slot" .. selectedFusionSacrifice)) or "None"
-			expectedFusionResult = FusionRecipes[baseTitan] and FusionRecipes[baseTitan][sacTitan]
 			Network:WaitForChild("FuseTitan"):FireServer(selectedFusionBase, selectedFusionSacrifice)
 			selectedFusionBase = nil; selectedFusionSacrifice = nil; fusionState = "Base"
 		end
@@ -485,8 +480,28 @@ function ForgeTab.Init(parentFrame, tooltipMgr)
 	FusVaultPanel.Size = UDim2.new(0.95, 0, 0, 0); FusVaultPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 25); FusVaultPanel.LayoutOrder = 2
 	Instance.new("UICorner", FusVaultPanel).CornerRadius = UDim.new(0, 8); Instance.new("UIStroke", FusVaultPanel).Color = Color3.fromRGB(80, 80, 90)
 
-	local vTitleLbl = Instance.new("TextLabel", FusVaultPanel)
-	vTitleLbl.Size = UDim2.new(1, 0, 0, 30); vTitleLbl.Position = UDim2.new(0, 0, 0, 5); vTitleLbl.BackgroundTransparency = 1; vTitleLbl.Font = Enum.Font.GothamBlack; vTitleLbl.TextColor3 = Color3.fromRGB(200, 200, 200); vTitleLbl.TextSize = 12; vTitleLbl.Text = "SELECT A TITAN FROM YOUR VAULT"
+	-- [[ FIX: Added explicit step tracking text ]]
+	FusionInstructionLbl = Instance.new("TextLabel", FusVaultPanel)
+	FusionInstructionLbl.Size = UDim2.new(1, 0, 0, 30); FusionInstructionLbl.Position = UDim2.new(0, 0, 0, 5); FusionInstructionLbl.BackgroundTransparency = 1; FusionInstructionLbl.Font = Enum.Font.GothamBlack; FusionInstructionLbl.TextColor3 = Color3.fromRGB(255, 215, 100); FusionInstructionLbl.TextSize = 14; FusionInstructionLbl.Text = "STEP 1: SELECT BASE TITAN TO UPGRADE"
+
+	local function UpdateFusBoxVisuals()
+		local baseColor = (fusionState == "Base") and Color3.fromRGB(255, 215, 100) or Color3.fromRGB(60, 60, 70)
+		local sacColor = (fusionState == "Sacrifice") and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(60, 60, 70)
+
+		fusBaseBox:FindFirstChildOfClass("UIStroke").Color = baseColor
+		fusSacBox:FindFirstChildOfClass("UIStroke").Color = sacColor
+
+		if fusionState == "Base" then
+			FusionInstructionLbl.Text = "STEP 1: SELECT BASE TITAN TO UPGRADE"
+			FusionInstructionLbl.TextColor3 = Color3.fromRGB(255, 215, 100)
+		else
+			FusionInstructionLbl.Text = "STEP 2: SELECT SACRIFICE TITAN TO CONSUME"
+			FusionInstructionLbl.TextColor3 = Color3.fromRGB(255, 100, 100)
+		end
+	end
+
+	fusBaseBox.MouseButton1Click:Connect(function() fusionState = "Base"; UpdateFusBoxVisuals() end)
+	fusSacBox.MouseButton1Click:Connect(function() fusionState = "Sacrifice"; UpdateFusBoxVisuals() end)
 
 	VaultList = Instance.new("Frame", FusVaultPanel)
 	VaultList.Size = UDim2.new(1, -10, 0, 0); VaultList.Position = UDim2.new(0, 5, 0, 35); VaultList.BackgroundTransparency = 1
@@ -563,7 +578,7 @@ function ForgeTab.Init(parentFrame, tooltipMgr)
 		createVaultCard("Equipped", player:GetAttribute("Titan") or "None", 0)
 		for i = 1, 6 do createVaultCard(i, player:GetAttribute("Titan_Slot" .. i) or "None", i) end
 
-		local function updateBox(box, sId, cColor)
+		local function updateBox(box, sId, cColor, placeholderText)
 			local tName = sId and player:GetAttribute(sId == "Equipped" and "Titan" or ("Titan_Slot"..sId)) or "None"
 			local bNameLbl = box:FindFirstChildOfClass("TextLabel")
 			local bRarTxt = box:FindFirstChild("Frame") and box.Frame:FindFirstChildOfClass("TextLabel")
@@ -573,13 +588,13 @@ function ForgeTab.Init(parentFrame, tooltipMgr)
 				bNameLbl.Text = tName; bNameLbl.TextColor3 = Color3.fromHex((RarityColors[rKey] or "#FFFFFF"):gsub("#",""))
 				if bRarTxt then bRarTxt.Text = string.sub(rKey, 1, 1) end
 			else
-				bNameLbl.Text = "???"; bNameLbl.TextColor3 = Color3.fromRGB(150, 150, 150)
+				bNameLbl.Text = placeholderText; bNameLbl.TextColor3 = Color3.fromRGB(150, 150, 150)
 				if bRarTxt then bRarTxt.Text = "?" end
 			end
 		end
 
-		updateBox(fusBaseBox, selectedFusionBase, "#FFD700")
-		updateBox(fusSacBox, selectedFusionSacrifice, "#FF5555")
+		updateBox(fusBaseBox, selectedFusionBase, "#FFD700", "SELECT BASE")
+		updateBox(fusSacBox, selectedFusionSacrifice, "#FF5555", "SELECT SACRIFICE")
 
 		local resNameLbl = fusResBox:FindFirstChildOfClass("TextLabel")
 		local resRarTxt = fusResBox:FindFirstChild("Frame") and fusResBox.Frame:FindFirstChildOfClass("TextLabel")
@@ -619,12 +634,13 @@ function ForgeTab.Init(parentFrame, tooltipMgr)
 	-- [[ GLOBAL REFRESH LOGIC ]]
 	-- ==========================================
 	player.AttributeChanged:Connect(function(attr)
-		if attr == "Titan" and expectedFusionResult then
-			local newTitan = player:GetAttribute("Titan")
+		-- [[ FIX: Check Vault Slots as well as Equipped Slot for Fusion Cinematic ]]
+		if (attr == "Titan" or string.match(attr, "^Titan_Slot")) and expectedFusionResult then
+			local newTitan = player:GetAttribute(attr)
 			if newTitan == expectedFusionResult then
 				CinematicManager.Show("TITAN FUSED", newTitan, "#FFD700")
+				expectedFusionResult = nil
 			end
-			expectedFusionResult = nil
 		end
 
 		if string.match(attr, "Count$") or string.match(attr, "_Awakened$") or string.match(attr, "^Titan") then
