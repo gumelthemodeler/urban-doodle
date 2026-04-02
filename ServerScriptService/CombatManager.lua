@@ -1,6 +1,4 @@
 -- @ScriptType: Script
-
--- @ScriptType: Script
 -- @ScriptType: Script
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8,7 +6,7 @@ local EnemyData = require(ReplicatedStorage:WaitForChild("EnemyData"))
 local ItemData = require(ReplicatedStorage:WaitForChild("ItemData"))
 local SkillData = require(ReplicatedStorage:WaitForChild("SkillData"))
 local CombatCore = require(script.Parent:WaitForChild("CombatCore"))
-local LootManager = require(script.Parent:WaitForChild("LootManager")) -- [[ NEW: Data Driven Looting ]]
+local LootManager = require(script.Parent:WaitForChild("LootManager"))
 
 local Network = ReplicatedStorage:FindFirstChild("Network") or Instance.new("Folder", ReplicatedStorage)
 Network.Name = "Network"
@@ -45,11 +43,12 @@ local function GetTemplate(partData, templateName)
 	return partData.Mobs[1] 
 end
 
+-- [[ FIX: Massively nerfed scaling multipliers. No more infinite bullet sponges. ]]
 local function GetHPScale(targetPart, prestige)
-	return 1.0 + (targetPart * 0.5) + (prestige * 1.5) 
+	return 1.0 + (targetPart * 0.15) + (prestige * 0.4) 
 end
 local function GetDmgScale(targetPart, prestige)
-	return 1.0 + (targetPart * 0.3) + (prestige * 1.0) 
+	return 1.0 + (targetPart * 0.1) + (prestige * 0.3) 
 end
 
 local function GetActualStyle(plr)
@@ -298,7 +297,6 @@ local function ProcessEnemyDeath(player, battle)
 
 	local killMsg = ""
 
-	-- [[ NEW: Process all drops through LootManager securely ]]
 	local droppedItems, autoSoldDews = LootManager.ProcessDrops(player, battle.Enemy.Drops, battle.Context.IsEndless, battle.Context.CurrentWave)
 
 	if autoSoldDews > 0 then
@@ -577,7 +575,6 @@ CombatAction.OnServerEvent:Connect(function(player, actionType, actionData)
 		if battle.Player.HP < 1 or battle.Enemy.HP < 1 then break end
 		if combatant.HP < 1 then continue end
 
-		-- [[ NEW: Secure Status Ticking ]]
 		local dotDamage, dotLog = CombatCore.TickStatuses(combatant)
 
 		if dotDamage > 0 then
