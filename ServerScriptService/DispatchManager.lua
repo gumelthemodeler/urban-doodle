@@ -1,4 +1,7 @@
 -- @ScriptType: Script
+
+-- @ScriptType: Script
+-- @ScriptType: Script
 -- @ScriptType: Script
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
