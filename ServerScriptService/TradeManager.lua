@@ -1,10 +1,10 @@
 -- @ScriptType: Script
+-- @ScriptType: Script
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
 local RemotesFolder = ReplicatedStorage:WaitForChild("Network")
 
--- GUARANTEE REMOTES EXIST SO NO INFINITE YIELDS HAPPEN
 local TradeAction = RemotesFolder:FindFirstChild("TradeAction") or Instance.new("RemoteEvent", RemotesFolder); TradeAction.Name = "TradeAction"
 local TradeRequest = RemotesFolder:FindFirstChild("TradeRequest") or Instance.new("RemoteEvent", RemotesFolder); TradeRequest.Name = "TradeRequest"
 local TradeUpdate = RemotesFolder:FindFirstChild("TradeUpdate") or Instance.new("RemoteEvent", RemotesFolder); TradeUpdate.Name = "TradeUpdate"
@@ -13,6 +13,7 @@ local ItemData = require(ReplicatedStorage:WaitForChild("ItemData"))
 
 local ActiveTrades = {} 
 local TradeRequests = {} 
+local RateLimits = {} 
 
 local MAX_INVENTORY_CAPACITY = 50
 
@@ -33,11 +34,11 @@ local function CancelTrade(tradeId, reason)
 	trade.Version = (trade.Version or 0) + 1 
 
 	if trade.P1 then 
-		trade.P1:SetAttribute("InTrade", false) -- [[ FIX: Remove Lock ]]
+		trade.P1:SetAttribute("InTrade", false)
 		RemotesFolder.TradeUpdate:FireClient(trade.P1, "TradeCancelled", reason) 
 	end
 	if trade.P2 then 
-		trade.P2:SetAttribute("InTrade", false) -- [[ FIX: Remove Lock ]]
+		trade.P2:SetAttribute("InTrade", false)
 		RemotesFolder.TradeUpdate:FireClient(trade.P2, "TradeCancelled", reason) 
 	end
 	ActiveTrades[tradeId] = nil
@@ -63,7 +64,7 @@ local function ExecuteTrade(tradeId)
 		if plr.leaderstats.Dews.Value < offer.Dews then return false, "Not enough Dews." end
 		for itemName, amount in pairs(offer.Items) do
 			local safeName = itemName:gsub("[^%w]", "") .. "Count"
-			if (plr:GetAttribute(safeName) or 0) < amount then return false, "Missing items." end
+			if (plr:GetAttribute(safeName) or 0) < amount then return false, "Missing items. Inventory changed during countdown." end
 
 			if plr:GetAttribute("EquippedWeapon") == itemName or plr:GetAttribute("EquippedAccessory") == itemName then
 				return false, "Cannot trade equipped items."
@@ -123,11 +124,9 @@ local function ExecuteTrade(tradeId)
 		trade.P2:SetAttribute(safeName, (trade.P2:GetAttribute(safeName) or 0) + amount)
 	end
 
-	-- [[ FIX: Remove Locks upon successful trade ]]
 	trade.P1:SetAttribute("InTrade", false)
 	trade.P2:SetAttribute("InTrade", false)
 
-	-- [[ FIX: Format Items for Logging and Notifications ]]
 	local function FormatItems(itemsTable)
 		local str = ""
 		for k, v in pairs(itemsTable) do str = str .. v .. "x " .. k .. ", " end
@@ -138,21 +137,17 @@ local function ExecuteTrade(tradeId)
 	local p1GivesItems = FormatItems(trade.P1Offer.Items)
 	local p2GivesItems = FormatItems(trade.P2Offer.Items)
 
-	-- 1. Anti-Scam Console Logger
 	print("[TRADE SECURE LOG] " .. trade.P1.Name .. " traded [" .. p1GivesItems .. " | " .. trade.P1Offer.Dews .. " Dews] TO " .. trade.P2.Name .. " FOR [" .. p2GivesItems .. " | " .. trade.P2Offer.Dews .. " Dews]")
 
-	-- 2. Build the Notification Strings
 	local p1ReceivedMsg = "Trade Processed! Received: " .. p2GivesItems
 	if trade.P2Offer.Dews > 0 then p1ReceivedMsg = p1ReceivedMsg .. " & " .. trade.P2Offer.Dews .. " Dews" end
 
 	local p2ReceivedMsg = "Trade Processed! Received: " .. p1GivesItems
 	if trade.P1Offer.Dews > 0 then p2ReceivedMsg = p2ReceivedMsg .. " & " .. trade.P1Offer.Dews .. " Dews" end
 
-	-- 3. Fire Client Notifications
 	RemotesFolder.NotificationEvent:FireClient(trade.P1, p1ReceivedMsg, "Success")
 	RemotesFolder.NotificationEvent:FireClient(trade.P2, p2ReceivedMsg, "Success")
 
-	-- 4. Close the Trade UI
 	RemotesFolder.TradeUpdate:FireClient(trade.P1, "TradeComplete")
 	RemotesFolder.TradeUpdate:FireClient(trade.P2, "TradeComplete")
 	ActiveTrades[tradeId] = nil
@@ -168,13 +163,23 @@ local function ResetTradeState(trade)
 end
 
 RemotesFolder:WaitForChild("TradeAction").OnServerEvent:Connect(function(player, action, data)
+	local now = os.clock()
+	local lastCall = RateLimits[player.UserId] or 0
+	if now - lastCall < 0.1 then return end 
+	RateLimits[player.UserId] = now
+
 	local tradeId, trade = GetTradeForPlayer(player)
 
 	if action == "SendRequest" then
 		if trade then RemotesFolder.NotificationEvent:FireClient(player, "You are already in a trade!", "Error") return end
-		local target = Players:FindFirstChild(data)
+		local target = Players:FindFirstChild(tostring(data))
 		if not target or target == player then return end
-		if GetTradeForPlayer(target) then RemotesFolder.NotificationEvent:FireClient(player, "That player is busy.", "Error") return end
+
+		-- [[ FIX: Removed fragile InTrade checks. Relies strictly on ActiveTrades dictionary. ]]
+		if GetTradeForPlayer(target) then 
+			RemotesFolder.NotificationEvent:FireClient(player, "That player is currently busy.", "Error") 
+			return 
+		end
 
 		if not TradeRequests[target.UserId] then TradeRequests[target.UserId] = {} end
 		TradeRequests[target.UserId][player.UserId] = true
@@ -183,7 +188,7 @@ RemotesFolder:WaitForChild("TradeAction").OnServerEvent:Connect(function(player,
 		RemotesFolder.NotificationEvent:FireClient(player, "Trade request sent to " .. target.Name, "Info")
 
 	elseif action == "AcceptRequest" then
-		local target = Players:FindFirstChild(data)
+		local target = Players:FindFirstChild(tostring(data))
 		if not target then 
 			RemotesFolder.NotificationEvent:FireClient(player, "Player has left the game.", "Error")
 			return 
@@ -196,16 +201,16 @@ RemotesFolder:WaitForChild("TradeAction").OnServerEvent:Connect(function(player,
 
 		TradeRequests[player.UserId][target.UserId] = nil
 
+		-- [[ FIX: Clear ghost states securely if players aren't actually in ActiveTrades ]]
 		if GetTradeForPlayer(player) or GetTradeForPlayer(target) then 
 			RemotesFolder.NotificationEvent:FireClient(player, "One of the players is currently busy.", "Error")
 			return 
 		end
 
-		RemotesFolder.NotificationEvent:FireClient(target, player.Name .. " accepted your trade request!", "Success")
-
-		-- [[ FIX: Apply Locks to prevent inventory equipping mid-trade ]]
 		player:SetAttribute("InTrade", true)
 		target:SetAttribute("InTrade", true)
+
+		RemotesFolder.NotificationEvent:FireClient(target, player.Name .. " accepted your trade request!", "Success")
 
 		local newTradeId = HttpService:GenerateGUID(false)
 		ActiveTrades[newTradeId] = {
@@ -224,7 +229,7 @@ RemotesFolder:WaitForChild("TradeAction").OnServerEvent:Connect(function(player,
 		end)
 
 	elseif action == "DeclineRequest" then
-		local target = Players:FindFirstChild(data)
+		local target = Players:FindFirstChild(tostring(data))
 		if target and TradeRequests[player.UserId] then 
 			TradeRequests[player.UserId][target.UserId] = nil 
 			RemotesFolder.NotificationEvent:FireClient(target, player.Name .. " declined your trade request.", "Error")
@@ -244,7 +249,10 @@ RemotesFolder:WaitForChild("TradeAction").OnServerEvent:Connect(function(player,
 			SyncTradeUI(trade)
 
 		elseif action == "AddItem" then
-			local itemName = type(data) == "table" and data.Item or data
+			local itemName = tostring(type(data) == "table" and data.Item or data)
+
+			if not ItemData.Equipment[itemName] and not ItemData.Consumables[itemName] then return end
+
 			local safeName = itemName:gsub("[^%w]", "") .. "Count"
 			local owned = player:GetAttribute(safeName) or 0
 			local currentlyOffered = myOffer.Items[itemName] or 0
@@ -261,7 +269,8 @@ RemotesFolder:WaitForChild("TradeAction").OnServerEvent:Connect(function(player,
 			end
 
 		elseif action == "RemoveItem" then
-			local itemName = type(data) == "table" and data.Item or data
+			local itemName = tostring(type(data) == "table" and data.Item or data)
+
 			if myOffer.Items[itemName] and myOffer.Items[itemName] > 0 then
 				myOffer.Items[itemName] -= 1
 				if myOffer.Items[itemName] <= 0 then myOffer.Items[itemName] = nil end
@@ -305,6 +314,7 @@ RemotesFolder:WaitForChild("TradeAction").OnServerEvent:Connect(function(player,
 end)
 
 Players.PlayerRemoving:Connect(function(plr)
+	RateLimits[plr.UserId] = nil
 	local tid, trade = GetTradeForPlayer(plr)
 	if tid then CancelTrade(tid, plr.Name .. " disconnected.") end
 	TradeRequests[plr.UserId] = nil
