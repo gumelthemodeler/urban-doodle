@@ -11,7 +11,7 @@ local ItemData = require(ReplicatedStorage:WaitForChild("ItemData"))
 
 local GameDataStore = DataStoreService:GetDataStore("AoT_Data_V6")
 local BackupDataStore = DataStoreService:GetDataStore("AoT_Backups_V3")
-local RegimentStore = DataStoreService:GetDataStore("RegimentWars_V4") -- Upgraded to V4 for Turf War Map
+local RegimentStore = DataStoreService:GetDataStore("RegimentWars_V4") 
 
 local PrestigeLB = DataStoreService:GetOrderedDataStore("Global_Prestige_LB_V3")
 local EloLB = DataStoreService:GetOrderedDataStore("Global_Elo_LB_V3")
@@ -82,7 +82,6 @@ local DefaultData = {
 	LoginStreak = 0, LastLoginDate = "", AutoTrainSessionTime = 0 
 }
 
--- [[ NEW: Turf War District Structure ]]
 local CurrentVP = {
 	Week = math.floor(os.time() / 604800),
 	Districts = {
@@ -121,7 +120,6 @@ task.spawn(function()
 	while true do
 		local currentWeek = math.floor(os.time() / 604800)
 		if currentWeek > CurrentVP.Week then
-			-- Calculate winners for all districts at the end of the week!
 			for dName, dData in pairs(CurrentVP.Districts) do
 				local winner = "None"; local highest = -1
 				for reg, vp in pairs(dData) do 
@@ -202,15 +200,20 @@ pcall(function()
 		for _, p in ipairs(Players:GetPlayers()) do
 			local success, backup = pcall(function() return BackupDataStore:GetAsync("Backup_" .. p.UserId) end)
 			if success and backup then
-				pcall(function() GameDataStore:SetAsync(p.UserId, backup) end)
+				pcall(function() GameDataStore:SetAsync(tostring(p.UserId), backup) end)
 				p:Kick("SYSTEM ALARM: A Global Data Rollback has been initiated by Administrators. Your previous safe save has been restored. Please rejoin.")
 			end
 		end
 	end)
 end)
 
+local AdminManager = require(ReplicatedStorage:WaitForChild("AdminManager"))
+
 RemotesFolder.AdminCommand.OnServerEvent:Connect(function(player, command, targetName, args)
-	if player.UserId ~= 4068160397 and player.Name ~= "girthbender1209" then player:Kick("Unauthorized Admin Access"); return end
+	if not AdminManager.IsAdmin(player) then
+		player:Kick("Unauthorized Admin Access")
+		return
+	end
 
 	if command == "GlobalRollback" then
 		pcall(function() MessagingService:PublishAsync("GlobalDataRollback", "Initiate") end)
@@ -301,7 +304,7 @@ local function RollBounties(player)
 end
 
 local function LoadPlayer(player)
-	local success, savedData = pcall(function() return GameDataStore:GetAsync(player.UserId) end)
+	local success, savedData = pcall(function() return GameDataStore:GetAsync(tostring(player.UserId)) end)
 
 	if not success then
 		player:Kick("Roblox DataStores are currently experiencing issues. Please rejoin to protect your save data.")
@@ -322,19 +325,28 @@ local function LoadPlayer(player)
 	end
 
 	local leaderstats = Instance.new("Folder"); leaderstats.Name = "leaderstats"; leaderstats.Parent = player
+
 	local pVal = Instance.new("IntValue"); pVal.Name = "Prestige"; pVal.Value = data.Prestige or 0; pVal.Parent = leaderstats
+	pVal.Changed:Connect(function(val) player:SetAttribute("Prestige", val) end)
+	player:SetAttribute("Prestige", pVal.Value)
+
 	local dVal = Instance.new("IntValue"); dVal.Name = "Dews"; dVal.Value = data.Dews or 0; dVal.Parent = leaderstats
+	dVal.Changed:Connect(function(val) player:SetAttribute("Dews", val) end)
+	player:SetAttribute("Dews", dVal.Value)
+
 	local eVal = Instance.new("IntValue"); eVal.Name = "Elo"; eVal.Value = data.Elo or 1000; eVal.Parent = leaderstats
+	eVal.Changed:Connect(function(val) player:SetAttribute("Elo", val) end)
+	player:SetAttribute("Elo", eVal.Value)
 
 	for k, v in pairs(DefaultData) do if k ~= "Prestige" and k ~= "Dews" and k ~= "Elo" then player:SetAttribute(k, data[k] or v) end end
 	for k, v in pairs(data) do if DefaultData[k] == nil and k ~= "Prestige" and k ~= "Dews" and k ~= "Elo" then player:SetAttribute(k, v) end end
 
-	-- [[ FIX: Check all districts for weekly rewards ]]
 	local myReg = player:GetAttribute("Regiment")
 	if myReg then
 		for dName, dData in pairs(CurrentVP.Districts) do
-			if dData.Winner == myReg and player:GetAttribute("RewardClaimedWeek_"..dName) ~= CurrentVP.Week then
-				player:SetAttribute("RewardClaimedWeek_"..dName, CurrentVP.Week)
+			local safeDistrictName = dName:gsub("[^%w]", "")
+			if dData.Winner == myReg and player:GetAttribute("RewardClaimedWeek_" .. safeDistrictName) ~= CurrentVP.Week then
+				player:SetAttribute("RewardClaimedWeek_" .. safeDistrictName, CurrentVP.Week)
 
 				player.leaderstats.Dews.Value += 25000
 				player:SetAttribute("TitanHardeningExtractCount", (player:GetAttribute("TitanHardeningExtractCount") or 0) + 1)
@@ -392,31 +404,90 @@ end
 Players.PlayerAdded:Connect(LoadPlayer)
 for _, p in ipairs(Players:GetPlayers()) do task.spawn(function() LoadPlayer(p) end) end
 
-local function SavePlayer(p)
-	if not p:GetAttribute("DataLoaded") then return end
-	if not p:FindFirstChild("leaderstats") then return end
+local lastSaveTimes = {}
+local savingPlayers = {}
 
-	local d = { Prestige = p.leaderstats.Prestige.Value, Dews = p.leaderstats.Dews.Value, Elo = p.leaderstats.Elo.Value }
-	for k, v in pairs(p:GetAttributes()) do 
-		if k ~= "DataLoaded" then d[k] = v end 
+local function SavePlayer(p, isLeaving)
+	-- Check if player exists and is actively loaded
+	if not p or not p:GetAttribute("DataLoaded") then return end
+	if savingPlayers[p.UserId] then return end 
+
+	if isLeaving then
+		savingPlayers[p.UserId] = true
 	end
 
-	pcall(function() GameDataStore:SetAsync(p.UserId, d) end)
+	-- [[ FIX: EXTRACT ALL DATA SYNCHRONOUSLY BEFORE YIELDING ]]
+	-- If we yield before extraction, Roblox deletes the player and the save wipes!
+	local userIdStr = tostring(p.UserId)
+	local pName = p.Name
+	local dataToSave = {}
 
-	pcall(function() PrestigeLB:SetAsync(tostring(p.UserId), p.leaderstats.Prestige.Value) end)
-	pcall(function() EloLB:SetAsync(tostring(p.UserId), p.leaderstats.Elo.Value) end)
+	for k, v in pairs(p:GetAttributes()) do 
+		if k ~= "DataLoaded" and k ~= "InTrade" then 
+			dataToSave[k] = v 
+		end 
+	end
+
+	local ls = p:FindFirstChild("leaderstats")
+	if ls then
+		if ls:FindFirstChild("Prestige") then dataToSave.Prestige = ls.Prestige.Value end
+		if ls:FindFirstChild("Dews") then dataToSave.Dews = ls.Dews.Value end
+		if ls:FindFirstChild("Elo") then dataToSave.Elo = ls.Elo.Value end
+	else
+		dataToSave.Prestige = p:GetAttribute("Prestige") or 0
+		dataToSave.Dews = p:GetAttribute("Dews") or 0
+		dataToSave.Elo = p:GetAttribute("Elo") or 1000
+	end
+
+	-- [[ NOW IT IS SAFE TO YIELD/THROTTLE ]]
+	local now = os.clock()
+	local lastSave = lastSaveTimes[p.UserId] or 0
+	if now - lastSave < 6.5 then
+		if isLeaving then
+			task.wait(6.5 - (now - lastSave))
+		else
+			return -- Skip autosave if too fast
+		end
+	end
+
+	lastSaveTimes[p.UserId] = os.clock()
+
+	-- Proceed with saving the pre-extracted data
+	local success, err = pcall(function() GameDataStore:SetAsync(userIdStr, dataToSave) end)
+
+	if not success then
+		warn("[DataManager] Failed to save " .. pName .. " Data: " .. tostring(err))
+	end
+
+	pcall(function() PrestigeLB:SetAsync(userIdStr, dataToSave.Prestige) end)
+	pcall(function() EloLB:SetAsync(userIdStr, dataToSave.Elo) end)
+
+	if isLeaving then
+		savingPlayers[p.UserId] = nil
+	end
 end
 
-Players.PlayerRemoving:Connect(SavePlayer)
+Players.PlayerRemoving:Connect(function(p)
+	SavePlayer(p, true)
+end)
 
 task.spawn(function() 
 	while true do 
 		task.wait(120) 
-		for _, p in ipairs(Players:GetPlayers()) do SavePlayer(p) end 
+		for _, p in ipairs(Players:GetPlayers()) do 
+			task.spawn(function() SavePlayer(p, false) end) 
+		end 
 	end 
 end)
 
 game:BindToClose(function() 
-	for _, p in ipairs(Players:GetPlayers()) do SavePlayer(p) end 
-	task.wait(3) 
+	for _, p in ipairs(Players:GetPlayers()) do 
+		task.spawn(function() SavePlayer(p, true) end) 
+	end 
+
+	local waitTime = 0
+	while next(savingPlayers) and waitTime < 25 do
+		task.wait(1)
+		waitTime += 1
+	end
 end)
