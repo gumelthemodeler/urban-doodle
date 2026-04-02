@@ -200,7 +200,7 @@ pcall(function()
 		for _, p in ipairs(Players:GetPlayers()) do
 			local success, backup = pcall(function() return BackupDataStore:GetAsync("Backup_" .. p.UserId) end)
 			if success and backup then
-				pcall(function() GameDataStore:SetAsync(tostring(p.UserId), backup) end)
+				pcall(function() GameDataStore:SetAsync(p.UserId, backup) end)
 				p:Kick("SYSTEM ALARM: A Global Data Rollback has been initiated by Administrators. Your previous safe save has been restored. Please rejoin.")
 			end
 		end
@@ -304,7 +304,7 @@ local function RollBounties(player)
 end
 
 local function LoadPlayer(player)
-	local success, savedData = pcall(function() return GameDataStore:GetAsync(tostring(player.UserId)) end)
+	local success, savedData = pcall(function() return GameDataStore:GetAsync(player.UserId) end)
 
 	if not success then
 		player:Kick("Roblox DataStores are currently experiencing issues. Please rejoin to protect your save data.")
@@ -404,90 +404,49 @@ end
 Players.PlayerAdded:Connect(LoadPlayer)
 for _, p in ipairs(Players:GetPlayers()) do task.spawn(function() LoadPlayer(p) end) end
 
-local lastSaveTimes = {}
-local savingPlayers = {}
+local function SavePlayer(p)
+	if not p:GetAttribute("DataLoaded") then return end
 
-local function SavePlayer(p, isLeaving)
-	-- Check if player exists and is actively loaded
-	if not p or not p:GetAttribute("DataLoaded") then return end
-	if savingPlayers[p.UserId] then return end 
-
-	if isLeaving then
-		savingPlayers[p.UserId] = true
-	end
-
-	-- [[ FIX: EXTRACT ALL DATA SYNCHRONOUSLY BEFORE YIELDING ]]
-	-- If we yield before extraction, Roblox deletes the player and the save wipes!
-	local userIdStr = tostring(p.UserId)
-	local pName = p.Name
-	local dataToSave = {}
-
-	for k, v in pairs(p:GetAttributes()) do 
-		if k ~= "DataLoaded" and k ~= "InTrade" then 
-			dataToSave[k] = v 
-		end 
-	end
+	local prestigeVal = p:GetAttribute("Prestige") or 0
+	local dewsVal = p:GetAttribute("Dews") or 0
+	local eloVal = p:GetAttribute("Elo") or 1000
 
 	local ls = p:FindFirstChild("leaderstats")
 	if ls then
-		if ls:FindFirstChild("Prestige") then dataToSave.Prestige = ls.Prestige.Value end
-		if ls:FindFirstChild("Dews") then dataToSave.Dews = ls.Dews.Value end
-		if ls:FindFirstChild("Elo") then dataToSave.Elo = ls.Elo.Value end
-	else
-		dataToSave.Prestige = p:GetAttribute("Prestige") or 0
-		dataToSave.Dews = p:GetAttribute("Dews") or 0
-		dataToSave.Elo = p:GetAttribute("Elo") or 1000
+		if ls:FindFirstChild("Prestige") then prestigeVal = ls.Prestige.Value end
+		if ls:FindFirstChild("Dews") then dewsVal = ls.Dews.Value end
+		if ls:FindFirstChild("Elo") then eloVal = ls.Elo.Value end
 	end
 
-	-- [[ NOW IT IS SAFE TO YIELD/THROTTLE ]]
-	local now = os.clock()
-	local lastSave = lastSaveTimes[p.UserId] or 0
-	if now - lastSave < 6.5 then
-		if isLeaving then
-			task.wait(6.5 - (now - lastSave))
-		else
-			return -- Skip autosave if too fast
-		end
+	local d = { Prestige = prestigeVal, Dews = dewsVal, Elo = eloVal }
+
+	for k, v in pairs(p:GetAttributes()) do 
+		if k ~= "DataLoaded" and k ~= "InTrade" then 
+			d[k] = v 
+		end 
 	end
 
-	lastSaveTimes[p.UserId] = os.clock()
+	-- Back to the exact saving method used in your original script
+	pcall(function() GameDataStore:SetAsync(p.UserId, d) end)
 
-	-- Proceed with saving the pre-extracted data
-	local success, err = pcall(function() GameDataStore:SetAsync(userIdStr, dataToSave) end)
-
-	if not success then
-		warn("[DataManager] Failed to save " .. pName .. " Data: " .. tostring(err))
-	end
-
-	pcall(function() PrestigeLB:SetAsync(userIdStr, dataToSave.Prestige) end)
-	pcall(function() EloLB:SetAsync(userIdStr, dataToSave.Elo) end)
-
-	if isLeaving then
-		savingPlayers[p.UserId] = nil
-	end
+	pcall(function() PrestigeLB:SetAsync(tostring(p.UserId), prestigeVal) end)
+	pcall(function() EloLB:SetAsync(tostring(p.UserId), eloVal) end)
 end
 
-Players.PlayerRemoving:Connect(function(p)
-	SavePlayer(p, true)
-end)
+Players.PlayerRemoving:Connect(SavePlayer)
 
 task.spawn(function() 
 	while true do 
 		task.wait(120) 
 		for _, p in ipairs(Players:GetPlayers()) do 
-			task.spawn(function() SavePlayer(p, false) end) 
+			task.spawn(function() SavePlayer(p) end) 
 		end 
 	end 
 end)
 
 game:BindToClose(function() 
 	for _, p in ipairs(Players:GetPlayers()) do 
-		task.spawn(function() SavePlayer(p, true) end) 
+		task.spawn(function() SavePlayer(p) end) 
 	end 
-
-	local waitTime = 0
-	while next(savingPlayers) and waitTime < 25 do
-		task.wait(1)
-		waitTime += 1
-	end
+	task.wait(3) 
 end)
