@@ -46,9 +46,8 @@ local function DrawOfferItems(parentFrame, offerItems, canRemove)
 	end
 	for itemName, amount in pairs(offerItems) do
 		local itemBtn = Instance.new("TextButton", parentFrame)
-		itemBtn.Size = UDim2.new(0, 60, 0, 60)
+		itemBtn.Size = UDim2.new(0, 35, 0, 35) -- Ultra compact for columns
 
-		-- Fetch rarity color
 		local rColor = Color3.fromRGB(200, 200, 200)
 		local iData = ItemData.Equipment[itemName] or ItemData.Consumables[itemName]
 		if iData and iData.Rarity then
@@ -72,7 +71,6 @@ local function DrawOfferItems(parentFrame, offerItems, canRemove)
 	end
 end
 
--- [[ FIX: Draws the player's actual inventory for trading ]]
 local function DrawInventorySelector(parentFrame, currentOffer)
 	for _, child in ipairs(parentFrame:GetChildren()) do
 		if child:IsA("TextButton") then child:Destroy() end
@@ -87,7 +85,7 @@ local function DrawInventorySelector(parentFrame, currentOffer)
 
 			if available > 0 then
 				local itemBtn = Instance.new("TextButton", parentFrame)
-				itemBtn.Size = UDim2.new(0, 60, 0, 60)
+				itemBtn.Size = UDim2.new(0, 35, 0, 35)
 
 				local rColor = Color3.fromRGB(200, 200, 200)
 				if iData.Rarity == "Uncommon" then rColor = Color3.fromRGB(80, 220, 80)
@@ -124,7 +122,7 @@ function TradeMenu.Init(parentFrame, tooltipMgr)
 	PlayerListFrame.Size = UDim2.new(0.96, 0, 1, -60); PlayerListFrame.Position = UDim2.new(0.02, 0, 0, 60); PlayerListFrame.BackgroundTransparency = 1; PlayerListFrame.ScrollBarThickness = 0; PlayerListFrame.BorderSizePixel = 0
 
 	local plLayout = Instance.new("UIGridLayout", PlayerListFrame)
-	plLayout.CellSize = UDim2.new(0.98, 0, 0, 75); plLayout.CellPadding = UDim2.new(0, 0, 0, 10); plLayout.SortOrder = Enum.SortOrder.Name; plLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	plLayout.CellSize = UDim2.new(0.98, 0, 0, 50); plLayout.CellPadding = UDim2.new(0, 0, 0, 8); plLayout.SortOrder = Enum.SortOrder.Name; plLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 	local function RefreshPlayers()
 		for _, child in ipairs(PlayerListFrame:GetChildren()) do if child:IsA("Frame") then child:Destroy() end end
@@ -136,30 +134,31 @@ function TradeMenu.Init(parentFrame, tooltipMgr)
 				local stroke = Instance.new("UIStroke", row); stroke.Color = Color3.fromRGB(50, 50, 60); stroke.Thickness = 1; stroke.Transparency = 0.55; stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 				local avatar = Instance.new("ImageLabel", row)
-				avatar.Size = UDim2.new(0, 50, 0, 50); avatar.Position = UDim2.new(0, 10, 0.5, 0); avatar.AnchorPoint = Vector2.new(0, 0.5); avatar.BackgroundColor3 = Color3.fromRGB(15, 15, 20); avatar.Image = "rbxthumb://type=AvatarHeadShot&id="..p.UserId.."&w=150&h=150"
-				Instance.new("UICorner", avatar).CornerRadius = UDim.new(0, 6)
+				avatar.Size = UDim2.new(0, 35, 0, 35); avatar.Position = UDim2.new(0, 10, 0.5, 0); avatar.AnchorPoint = Vector2.new(0, 0.5); avatar.BackgroundColor3 = Color3.fromRGB(15, 15, 20); avatar.Image = "rbxthumb://type=AvatarHeadShot&id="..p.UserId.."&w=150&h=150"
+				Instance.new("UICorner", avatar).CornerRadius = UDim.new(0, 4)
 
 				local nLbl = Instance.new("TextLabel", row)
-				nLbl.Size = UDim2.new(1, -160, 1, 0); nLbl.Position = UDim2.new(0, 70, 0, 0); nLbl.BackgroundTransparency = 1; nLbl.Font = Enum.Font.GothamBlack; nLbl.TextColor3 = Color3.fromRGB(230, 230, 240); nLbl.TextSize = 14; nLbl.TextXAlignment = Enum.TextXAlignment.Left; nLbl.Text = string.upper(p.Name)
+				nLbl.Size = UDim2.new(1, -140, 1, 0); nLbl.Position = UDim2.new(0, 55, 0, 0); nLbl.BackgroundTransparency = 1; nLbl.Font = Enum.Font.GothamBlack; nLbl.TextColor3 = Color3.fromRGB(230, 230, 240); nLbl.TextSize = 13; nLbl.TextXAlignment = Enum.TextXAlignment.Left; nLbl.Text = string.upper(p.Name)
 
 				local reqBtn = Instance.new("TextButton", row)
-				reqBtn.Size = UDim2.new(0, 80, 0, 30); reqBtn.Position = UDim2.new(1, -10, 0.5, 0); reqBtn.AnchorPoint = Vector2.new(1, 0.5); reqBtn.Font = Enum.Font.GothamBlack; reqBtn.TextColor3 = Color3.fromRGB(150, 200, 255); reqBtn.TextSize = 11; reqBtn.Text = "REQUEST"
+				reqBtn.Size = UDim2.new(0, 70, 0, 26); reqBtn.Position = UDim2.new(1, -10, 0.5, 0); reqBtn.AnchorPoint = Vector2.new(1, 0.5); reqBtn.Font = Enum.Font.GothamBlack; reqBtn.TextColor3 = Color3.fromRGB(150, 200, 255); reqBtn.TextSize = 10; reqBtn.Text = "REQUEST"
 				ApplyButtonGradient(reqBtn, Color3.fromRGB(20, 25, 35), Color3.fromRGB(10, 15, 25), Color3.fromRGB(80, 140, 220))
 
 				reqBtn.MouseButton1Click:Connect(function()
-					-- FIX 1: Send the correct Action ("SendRequest") through the TradeAction remote
 					Network.TradeAction:FireServer("SendRequest", p.Name)
 
 					reqBtn.Text = "SENT"; reqBtn.TextColor3 = Color3.fromRGB(150, 255, 150)
 					ApplyButtonGradient(reqBtn, Color3.fromRGB(25, 35, 25), Color3.fromRGB(15, 20, 15), Color3.fromRGB(80, 180, 80))
 					task.delay(3, function() 
-						reqBtn.Text = "REQUEST"; reqBtn.TextColor3 = Color3.fromRGB(150, 200, 255)
-						ApplyButtonGradient(reqBtn, Color3.fromRGB(20, 25, 35), Color3.fromRGB(10, 15, 25), Color3.fromRGB(80, 140, 220)) 
+						if reqBtn and reqBtn.Parent then
+							reqBtn.Text = "REQUEST"; reqBtn.TextColor3 = Color3.fromRGB(150, 200, 255)
+							ApplyButtonGradient(reqBtn, Color3.fromRGB(20, 25, 35), Color3.fromRGB(10, 15, 25), Color3.fromRGB(80, 140, 220)) 
+						end
 					end)
 				end)
 			end
 		end
-		task.delay(0.05, function() PlayerListFrame.CanvasSize = UDim2.new(0, 0, 0, (#Players:GetPlayers() - 1) * 85 + 20) end)
+		task.delay(0.05, function() PlayerListFrame.CanvasSize = UDim2.new(0, 0, 0, (#Players:GetPlayers() - 1) * 58 + 20) end)
 	end
 
 	MainFrame:GetPropertyChangedSignal("Visible"):Connect(function() if MainFrame.Visible then RefreshPlayers() end end)
@@ -177,53 +176,68 @@ function TradeMenu.Init(parentFrame, tooltipMgr)
 
 			local mainPanel = Instance.new("Frame", overlay)
 			mainPanel.Name = "Frame"
-			mainPanel.Size = UDim2.new(0.95, 0, 0.95, 0); mainPanel.Position = UDim2.new(0.5, 0, 0.5, 0); mainPanel.AnchorPoint = Vector2.new(0.5, 0.5); mainPanel.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+			-- [[ FIX: Wide & Short. Escapes the bottom UI bar completely. ]]
+			mainPanel.Size = UDim2.new(0.9, 0, 0.55, 0) 
+			mainPanel.Position = UDim2.new(0.5, 0, 0.4, 0); mainPanel.AnchorPoint = Vector2.new(0.5, 0.5); mainPanel.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 			Instance.new("UICorner", mainPanel).CornerRadius = UDim.new(0, 8); Instance.new("UIStroke", mainPanel).Color = Color3.fromRGB(80, 140, 220); mainPanel.UIStroke.Thickness = 2
 
 			local title = Instance.new("TextLabel", mainPanel)
-			title.Size = UDim2.new(1, 0, 0, 40); title.BackgroundTransparency = 1; title.Font = Enum.Font.GothamBlack; title.TextColor3 = Color3.fromRGB(150, 200, 255); title.TextSize = 16; title.Text = "SESSION: " .. string.upper(data.OtherPlayer)
+			title.Size = UDim2.new(1, 0, 0, 25); title.Position = UDim2.new(0, 0, 0, 5); title.BackgroundTransparency = 1; title.Font = Enum.Font.GothamBlack; title.TextColor3 = Color3.fromRGB(150, 200, 255); title.TextSize = 14; title.Text = "SESSION: " .. string.upper(data.OtherPlayer)
 			ApplyGradient(title, Color3.fromRGB(150, 200, 255), Color3.fromRGB(50, 150, 255))
 
-			local tradeContentArea = Instance.new("Frame", mainPanel)
-			tradeContentArea.Name = "TradeContentArea"
-			tradeContentArea.Size = UDim2.new(1, -20, 1, -110); tradeContentArea.Position = UDim2.new(0, 10, 0, 50); tradeContentArea.BackgroundTransparency = 1
+			-- [[ FIX: Buttons are welded to the absolute bottom of the card ]]
+			local ButtonArea = Instance.new("Frame", mainPanel)
+			ButtonArea.Name = "ButtonArea"
+			ButtonArea.Size = UDim2.new(1, -20, 0, 32)
+			ButtonArea.Position = UDim2.new(0, 10, 1, -8) -- 8px padding from the absolute bottom
+			ButtonArea.AnchorPoint = Vector2.new(0, 1) -- Bottom Anchored
+			ButtonArea.BackgroundTransparency = 1
 
-			local myOfferFrame = Instance.new("ScrollingFrame", tradeContentArea)
-			myOfferFrame.Name = "MyOffer"
-			myOfferFrame.Size = UDim2.new(0.48, 0, 0.45, 0); myOfferFrame.Position = UDim2.new(0,0,0,0)
-			myOfferFrame.BackgroundColor3 = Color3.fromRGB(15,15,20); myOfferFrame.ScrollBarThickness = 0
-			Instance.new("UICorner", myOfferFrame).CornerRadius = UDim.new(0,6); Instance.new("UIStroke", myOfferFrame).Color = Color3.fromRGB(60,60,70)
-			local mg = Instance.new("UIGridLayout", myOfferFrame); mg.CellSize = UDim2.new(0, 60, 0, 60); mg.CellPadding = UDim2.new(0,5,0,5)
-			local mPad = Instance.new("UIPadding", myOfferFrame); mPad.PaddingTop = UDim.new(0,5); mPad.PaddingLeft = UDim.new(0,5)
-
-			local theirOfferFrame = Instance.new("ScrollingFrame", tradeContentArea)
-			theirOfferFrame.Name = "TheirOffer"
-			theirOfferFrame.Size = UDim2.new(0.48, 0, 0.45, 0); theirOfferFrame.Position = UDim2.new(0.52,0,0,0)
-			theirOfferFrame.BackgroundColor3 = Color3.fromRGB(15,15,20); theirOfferFrame.ScrollBarThickness = 0
-			Instance.new("UICorner", theirOfferFrame).CornerRadius = UDim.new(0,6); Instance.new("UIStroke", theirOfferFrame).Color = Color3.fromRGB(60,60,70)
-			local tg = Instance.new("UIGridLayout", theirOfferFrame); tg.CellSize = UDim2.new(0, 60, 0, 60); tg.CellPadding = UDim2.new(0,5,0,5)
-			local tPad = Instance.new("UIPadding", theirOfferFrame); tPad.PaddingTop = UDim.new(0,5); tPad.PaddingLeft = UDim.new(0,5)
-
-			-- [[ FIX: Graphic Inventory Selector replaces the text box ]]
-			local inventorySelector = Instance.new("ScrollingFrame", tradeContentArea)
-			inventorySelector.Name = "InventorySelector"
-			inventorySelector.Size = UDim2.new(1, 0, 0.45, 0); inventorySelector.Position = UDim2.new(0,0,0.55,0)
-			inventorySelector.BackgroundColor3 = Color3.fromRGB(12,12,15); inventorySelector.ScrollBarThickness = 0
-			Instance.new("UICorner", inventorySelector).CornerRadius = UDim.new(0,6); Instance.new("UIStroke", inventorySelector).Color = Color3.fromRGB(100,100,150)
-			local ig = Instance.new("UIGridLayout", inventorySelector); ig.CellSize = UDim2.new(0, 60, 0, 60); ig.CellPadding = UDim2.new(0,5,0,5)
-			local iPad = Instance.new("UIPadding", inventorySelector); iPad.PaddingTop = UDim.new(0,5); iPad.PaddingLeft = UDim.new(0,5)
-
-			local confirmBtn = Instance.new("TextButton", mainPanel)
-			confirmBtn.Name = "ConfirmBtn"; confirmBtn.Size = UDim2.new(0.45, 0, 0, 40); confirmBtn.Position = UDim2.new(0.03, 0, 1, -50); confirmBtn.Font = Enum.Font.GothamBlack; confirmBtn.TextColor3 = Color3.fromRGB(150, 255, 150); confirmBtn.TextSize = 12; confirmBtn.Text = "LOCK IN OFFER"
+			local confirmBtn = Instance.new("TextButton", ButtonArea)
+			confirmBtn.Name = "ConfirmBtn"; confirmBtn.Size = UDim2.new(0.48, 0, 1, 0); confirmBtn.Position = UDim2.new(0, 0, 0, 0); confirmBtn.Font = Enum.Font.GothamBlack; confirmBtn.TextColor3 = Color3.fromRGB(150, 255, 150); confirmBtn.TextSize = 12; confirmBtn.TextScaled = true; confirmBtn.Text = "LOCK IN OFFER"
+			Instance.new("UITextSizeConstraint", confirmBtn).MaxTextSize = 14
 			ApplyButtonGradient(confirmBtn, Color3.fromRGB(20, 35, 20), Color3.fromRGB(10, 20, 10), Color3.fromRGB(80, 180, 80))
-
 			confirmBtn.MouseButton1Click:Connect(function() Network.TradeAction:FireServer("ToggleConfirm") end)
 
-			local cancelBtn = Instance.new("TextButton", mainPanel)
-			cancelBtn.Size = UDim2.new(0.45, 0, 0, 40); cancelBtn.Position = UDim2.new(0.52, 0, 1, -50); cancelBtn.Font = Enum.Font.GothamBlack; cancelBtn.TextColor3 = Color3.fromRGB(255, 150, 150); cancelBtn.TextSize = 12; cancelBtn.Text = "ABORT"
+			local cancelBtn = Instance.new("TextButton", ButtonArea)
+			cancelBtn.Size = UDim2.new(0.48, 0, 1, 0); cancelBtn.Position = UDim2.new(1, 0, 0, 0); cancelBtn.AnchorPoint = Vector2.new(1, 0); cancelBtn.Font = Enum.Font.GothamBlack; cancelBtn.TextColor3 = Color3.fromRGB(255, 150, 150); cancelBtn.TextSize = 12; cancelBtn.TextScaled = true; cancelBtn.Text = "ABORT"
+			Instance.new("UITextSizeConstraint", cancelBtn).MaxTextSize = 14
 			ApplyButtonGradient(cancelBtn, Color3.fromRGB(35, 20, 20), Color3.fromRGB(20, 10, 10), Color3.fromRGB(180, 60, 60))
-
 			cancelBtn.MouseButton1Click:Connect(function() Network.TradeAction:FireServer("Cancel") end)
+
+			-- [[ FIX: 3-Column Layout. Content uses space safely between header and footer ]]
+			local tradeContentArea = Instance.new("Frame", mainPanel)
+			tradeContentArea.Name = "TradeContentArea"
+			tradeContentArea.Size = UDim2.new(1, -20, 1, -75)
+			tradeContentArea.Position = UDim2.new(0, 10, 0, 30)
+			tradeContentArea.BackgroundTransparency = 1
+
+			-- Column 1: My Offer
+			local myOfferFrame = Instance.new("ScrollingFrame", tradeContentArea)
+			myOfferFrame.Name = "MyOffer"
+			myOfferFrame.Size = UDim2.new(0.32, 0, 1, 0); myOfferFrame.Position = UDim2.new(0, 0, 0, 0)
+			myOfferFrame.BackgroundColor3 = Color3.fromRGB(15,15,20); myOfferFrame.ScrollBarThickness = 0
+			Instance.new("UICorner", myOfferFrame).CornerRadius = UDim.new(0,6); Instance.new("UIStroke", myOfferFrame).Color = Color3.fromRGB(60,60,70)
+			local mg = Instance.new("UIGridLayout", myOfferFrame); mg.CellSize = UDim2.new(0, 35, 0, 35); mg.CellPadding = UDim2.new(0,4,0,4)
+			Instance.new("UIPadding", myOfferFrame).PaddingTop = UDim.new(0,5); myOfferFrame.UIPadding.PaddingLeft = UDim.new(0,5)
+
+			-- Column 2: Their Offer
+			local theirOfferFrame = Instance.new("ScrollingFrame", tradeContentArea)
+			theirOfferFrame.Name = "TheirOffer"
+			theirOfferFrame.Size = UDim2.new(0.32, 0, 1, 0); theirOfferFrame.Position = UDim2.new(0.34, 0, 0, 0)
+			theirOfferFrame.BackgroundColor3 = Color3.fromRGB(15,15,20); theirOfferFrame.ScrollBarThickness = 0
+			Instance.new("UICorner", theirOfferFrame).CornerRadius = UDim.new(0,6); Instance.new("UIStroke", theirOfferFrame).Color = Color3.fromRGB(60,60,70)
+			local tg = Instance.new("UIGridLayout", theirOfferFrame); tg.CellSize = UDim2.new(0, 35, 0, 35); tg.CellPadding = UDim2.new(0,4,0,4)
+			Instance.new("UIPadding", theirOfferFrame).PaddingTop = UDim.new(0,5); theirOfferFrame.UIPadding.PaddingLeft = UDim.new(0,5)
+
+			-- Column 3: Inventory Selector
+			local inventorySelector = Instance.new("ScrollingFrame", tradeContentArea)
+			inventorySelector.Name = "InventorySelector"
+			inventorySelector.Size = UDim2.new(0.32, 0, 1, 0); inventorySelector.Position = UDim2.new(0.68, 0, 0, 0)
+			inventorySelector.BackgroundColor3 = Color3.fromRGB(12,12,15); inventorySelector.ScrollBarThickness = 0
+			Instance.new("UICorner", inventorySelector).CornerRadius = UDim.new(0,6); Instance.new("UIStroke", inventorySelector).Color = Color3.fromRGB(100,100,150)
+			local ig = Instance.new("UIGridLayout", inventorySelector); ig.CellSize = UDim2.new(0, 35, 0, 35); ig.CellPadding = UDim2.new(0,4,0,4)
+			Instance.new("UIPadding", inventorySelector).PaddingTop = UDim.new(0,5); inventorySelector.UIPadding.PaddingLeft = UDim.new(0,5)
 
 		elseif action == "Sync" then
 			local overlay = AOT_UI:FindFirstChild("TradeOverlay")
@@ -236,7 +250,9 @@ function TradeMenu.Init(parentFrame, tooltipMgr)
 			local theyReady = isP1 and data.P2Confirmed or data.P1Confirmed
 
 			local mainPanel = overlay:FindFirstChild("Frame")
-			local confirmBtn = mainPanel and mainPanel:FindFirstChild("ConfirmBtn")
+			local ButtonArea = mainPanel and mainPanel:FindFirstChild("ButtonArea")
+			local confirmBtn = ButtonArea and ButtonArea:FindFirstChild("ConfirmBtn")
+
 			local contentArea = mainPanel and mainPanel:FindFirstChild("TradeContentArea")
 
 			if confirmBtn then
@@ -263,17 +279,17 @@ function TradeMenu.Init(parentFrame, tooltipMgr)
 				if myFr then 
 					DrawOfferItems(myFr, myOffer.Items, true) 
 					local cCount = 0; for k,v in pairs(myOffer.Items) do cCount += 1 end
-					myFr.CanvasSize = UDim2.new(0,0,0, math.ceil(cCount/3)*65 + 10)
+					myFr.CanvasSize = UDim2.new(0,0,0, math.ceil(cCount/3)*40 + 10)
 				end
 				if theirFr then 
 					DrawOfferItems(theirFr, theirOffer.Items, false) 
 					local cCount = 0; for k,v in pairs(theirOffer.Items) do cCount += 1 end
-					theirFr.CanvasSize = UDim2.new(0,0,0, math.ceil(cCount/3)*65 + 10)
+					theirFr.CanvasSize = UDim2.new(0,0,0, math.ceil(cCount/3)*40 + 10)
 				end
 				if invFr then 
 					DrawInventorySelector(invFr, myOffer.Items)
 					local cCount = 0; for _, child in ipairs(invFr:GetChildren()) do if child:IsA("TextButton") then cCount += 1 end end
-					invFr.CanvasSize = UDim2.new(0,0,0, math.ceil(cCount/4)*65 + 10)
+					invFr.CanvasSize = UDim2.new(0,0,0, math.ceil(cCount/3)*40 + 10)
 				end
 			end
 
@@ -283,19 +299,17 @@ function TradeMenu.Init(parentFrame, tooltipMgr)
 	end)
 end
 
--- FIX 2: Listen for Incoming Trade Requests and Spawn a Popup
+-- [[ FIX: Shortened prompt, buttons securely anchored to the bottom ]]
 Network:WaitForChild("TradeRequest").OnClientEvent:Connect(function(senderName)
 	local AOT_UI = playerGui:WaitForChild("AOT_Interface", 5)
 	if not AOT_UI then return end
 
-	-- Don't spawn multiple prompts for the same person
 	if AOT_UI:FindFirstChild("IncomingTradePrompt_" .. senderName) then return end
 
-	-- Create a sleek notification prompt
 	local prompt = Instance.new("Frame", AOT_UI)
 	prompt.Name = "IncomingTradePrompt_" .. senderName
-	prompt.Size = UDim2.new(0, 300, 0, 120)
-	prompt.Position = UDim2.new(0.5, 0, 0.85, 0)
+	prompt.Size = UDim2.new(0.6, 0, 0, 90) 
+	prompt.Position = UDim2.new(0.5, 0, 0.25, 0)
 	prompt.AnchorPoint = Vector2.new(0.5, 0.5)
 	prompt.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 	Instance.new("UICorner", prompt).CornerRadius = UDim.new(0, 8)
@@ -304,18 +318,23 @@ Network:WaitForChild("TradeRequest").OnClientEvent:Connect(function(senderName)
 	stroke.Color = Color3.fromRGB(150, 200, 255); stroke.Thickness = 2
 
 	local lbl = Instance.new("TextLabel", prompt)
-	lbl.Size = UDim2.new(1, 0, 0, 50); lbl.BackgroundTransparency = 1
+	lbl.Size = UDim2.new(1, -20, 0, 30); lbl.Position = UDim2.new(0, 10, 0, 10); lbl.BackgroundTransparency = 1
 	lbl.Font = Enum.Font.GothamBlack; lbl.TextColor3 = Color3.fromRGB(255, 255, 255); lbl.TextSize = 14
-	lbl.Text = senderName .. " sent a trade request!"
+	lbl.TextScaled = true; lbl.Text = senderName .. " sent a trade request!"
+	Instance.new("UITextSizeConstraint", lbl).MaxTextSize = 16
 
 	local accBtn = Instance.new("TextButton", prompt)
-	accBtn.Size = UDim2.new(0.4, 0, 0, 40); accBtn.Position = UDim2.new(0.05, 0, 1, -50)
-	accBtn.Font = Enum.Font.GothamBlack; accBtn.TextColor3 = Color3.fromRGB(150, 255, 150); accBtn.Text = "ACCEPT"; accBtn.TextSize = 14
+	accBtn.Size = UDim2.new(0.45, 0, 0, 30)
+	accBtn.Position = UDim2.new(0.025, 0, 1, -10)
+	accBtn.AnchorPoint = Vector2.new(0, 1) -- Absolutely anchored
+	accBtn.Font = Enum.Font.GothamBlack; accBtn.TextColor3 = Color3.fromRGB(150, 255, 150); accBtn.Text = "ACCEPT"; accBtn.TextSize = 12
 	ApplyButtonGradient(accBtn, Color3.fromRGB(20, 40, 20), Color3.fromRGB(10, 20, 10), Color3.fromRGB(80, 180, 80))
 
 	local decBtn = Instance.new("TextButton", prompt)
-	decBtn.Size = UDim2.new(0.4, 0, 0, 40); decBtn.Position = UDim2.new(0.55, 0, 1, -50)
-	decBtn.Font = Enum.Font.GothamBlack; decBtn.TextColor3 = Color3.fromRGB(255, 150, 150); decBtn.Text = "DECLINE"; decBtn.TextSize = 14
+	decBtn.Size = UDim2.new(0.45, 0, 0, 30)
+	decBtn.Position = UDim2.new(0.525, 0, 1, -10)
+	decBtn.AnchorPoint = Vector2.new(0, 1) -- Absolutely anchored
+	decBtn.Font = Enum.Font.GothamBlack; decBtn.TextColor3 = Color3.fromRGB(255, 150, 150); decBtn.Text = "DECLINE"; decBtn.TextSize = 12
 	ApplyButtonGradient(decBtn, Color3.fromRGB(40, 20, 20), Color3.fromRGB(20, 10, 10), Color3.fromRGB(180, 80, 80))
 
 	accBtn.MouseButton1Click:Connect(function()
@@ -328,7 +347,6 @@ Network:WaitForChild("TradeRequest").OnClientEvent:Connect(function(senderName)
 		prompt:Destroy()
 	end)
 
-	-- Auto-destroy prompt after 15 seconds if ignored
 	task.delay(15, function()
 		if prompt and prompt.Parent then prompt:Destroy() end
 	end)
