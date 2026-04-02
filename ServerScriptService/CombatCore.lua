@@ -141,10 +141,16 @@ function CombatCore.CalculateDamage(attacker, defender, skillMult, targetLimb)
 	local effectiveAttack = atkStrength * atkBuff
 	local effectiveDefense = defArmor * defBuff
 
-	-- [[ NON-LINEAR DAMAGE FORMULA ]]
-	-- Power ratio scales inherently. Replaces all global modifiers and hard handicaps.
+	-- [[ THE PERMANENT FIX: PURE RATIO EXPONENTIAL MATH ]]
+	-- Completely strips out all "hardcap fixed values" (like the old 300 / 300+Armor logic).
+	-- Scales beautifully to infinity. If Defense heavily outweighs Attack, the damage organically curves down but never hits zero.
+	local statRatio = effectiveAttack / math.max(1, effectiveAttack + effectiveDefense)
+	local powerCurve = math.pow(statRatio, 1.25)
+
 	skillMult = tonumber(skillMult) or 1.0
-	local baseDmg = (math.pow(effectiveAttack, 1.35) / math.pow(effectiveDefense, 0.65)) * skillMult
+	local systemicMultiplier = attacker.IsPlayer and 1.5 or 0.35 
+
+	local baseDmg = effectiveAttack * powerCurve * skillMult * systemicMultiplier
 
 	targetLimb = tostring(targetLimb or "Body")
 	if targetLimb == "Nape" then
@@ -162,7 +168,7 @@ function CombatCore.CalculateDamage(attacker, defender, skillMult, targetLimb)
 	if defender.Name == "Abyssal Armored Titan" then
 		local aStyle = tostring(attacker.Style or "None")
 		if attacker.IsPlayer and not isAttackerTransformed and (aStyle == "Ultrahard Steel Blades" or aStyle == "None") then
-			baseDmg = math.pow(baseDmg, 0.5) -- Special non-linear mechanic resistance
+			baseDmg = math.pow(baseDmg, 0.65) -- Organic non-linear resistance
 		end
 	end
 
