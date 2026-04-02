@@ -1,4 +1,7 @@
 -- @ScriptType: Script
+
+-- @ScriptType: Script
+-- @ScriptType: Script
 -- ServerScriptService/PrestigeAuditor.lua
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
