@@ -1,4 +1,7 @@
 -- @ScriptType: Script
+
+-- @ScriptType: Script
+-- @ScriptType: Script
 -- @ScriptType: Script
 local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
