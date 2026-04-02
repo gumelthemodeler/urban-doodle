@@ -1,4 +1,7 @@
 -- @ScriptType: ModuleScript
+
+-- @ScriptType: ModuleScript
+-- @ScriptType: ModuleScript
 -- @ScriptType: ModuleScript
 local CosmeticData = {}
 
