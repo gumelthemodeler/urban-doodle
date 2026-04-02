@@ -1,5 +1,6 @@
 -- @ScriptType: Script
 -- @ScriptType: Script
+-- @ScriptType: Script
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local DataStoreService = game:GetService("DataStoreService")
@@ -10,48 +11,32 @@ local BackupDataStore = DataStoreService:GetDataStore("AoT_Backups_V1")
 local RemotesFolder = ReplicatedStorage:WaitForChild("Network")
 
 local ActiveCodes = { 
-	["RELEASE"] = { 
+	["MULTIPLAYERPART2"] = { 
 		Dews = 5000,
 		XP = 500,
 		Items = {
-			["Standard Titan Serum"] = 30,
-			["Clan Blood Vial"] = 25 
+			["Clan Blood Vial"] = 15 
 		}
 
-	}, 
-	["BUGFIX"] = { 
-		Dews = 1500, 
+	},
+	["NIGHTMAREMODE"] = { 
+		Dews = 1500,
 		Items = {
-			["Spinal Fluid Syringe"] = 1,
+			["Standard Titan Serum"] = 5,
 			["Titan Research Notes"] = 1,
 		}
-	}, 
-	["MULTIPLAYER"] = { 
-		Dews = 3500,
+	},
+	["APRILFOOLS"] = { 
+		Dews = 1000,
+		XP = 100,
+		Items = {
+			["Standard Titan Serum"] = 10,
+		}
+	},
+	["BUGFIX"] = { 
 		Items = {
 			["Standard Titan Serum"] = 15,
-			["Clan Blood Vial"] = 10,
-		}
-	},
-	["PRESTIGEFIX"] = { 
-		XP = 1500,
-		Items = {
-			["Standard Titan Serum"] = 5,
-			["Titan Research Notes"] = 1,
-		}
-	},
-	["PATHSHOP"] = { 
-		Dews = 1500,
-		Items = {
-			["Standard Titan Serum"] = 5,
-			["Titan Research Notes"] = 1,
-		}
-	},
-	["FIXED"] = { 
-		Dews = 1500,
-		Items = {
-			["Standard Titan Serum"] = 5,
-			["Titan Research Notes"] = 1,
+			["Clan Blood Vial"] = 15 
 		}
 	}
 }
