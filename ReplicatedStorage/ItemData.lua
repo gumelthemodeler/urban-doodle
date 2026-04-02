@@ -31,10 +31,10 @@ ItemData.Equipment = {
 	["Erwin's Pendant"] = { Type = "Accessory", Rarity = "Legendary", Cost = 45000, Bonus = { Resolve = 60, Defense = 30, Health = 30 }, Desc = "A symbol of absolute, unwavering leadership." },
 	["Coordinate's Sand"] = { Type = "Accessory", Rarity = "Mythical", Cost = 250000, Bonus = { Strength = 50, Defense = 50, Speed = 50, Resolve = 50, Gas = 50, Health = 50 }, Desc = "A handful of sand from the Paths. Godlike power." },
 
-	-- [[ NEW: CURSED NIGHTMARE EQUIPMENT ]]
-	["Blade of the Frenzied"] = { Type = "Weapon", Style = "Ultrahard Steel Blades", Rarity = "Transcendent", Cost = 1000000, Bonus = { Strength = 150, Speed = 50, Defense = -50 }, Cursed = true, SelfDamage = 0.05, Desc = "<font color='#FF3333'>[CURSED]</font> Insane damage, but you take 5% Max HP damage every time you attack. Halves your Defense." },
-	["Abyssal Thunder Spear"] = { Type = "Weapon", Style = "Thunder Spears", Rarity = "Transcendent", Cost = 1000000, Bonus = { Strength = 250, Speed = -20 }, Cursed = true, SelfDamage = 0.10, Desc = "<font color='#FF3333'>[CURSED]</font> A nuclear payload. You take 10% Max HP damage on launch. Sluggish speed." },
-	["Shroud of the Doomed"] = { Type = "Accessory", Rarity = "Transcendent", Cost = 1000000, Bonus = { Resolve = 200, Health = 100 }, Cursed = true, NoDodge = true, Desc = "<font color='#FF3333'>[CURSED]</font> Makes you incredibly tanky and immune to stun, but permanently drops your Dodge chance to 0%." }
+	-- [[ FIX: Massively buffed Transcendent weapons so the health drain is worth it ]]
+	["Blade of the Frenzied"] = { Type = "Weapon", Style = "Ultrahard Steel Blades", Rarity = "Transcendent", Cost = 1000000, Bonus = { Strength = 400, Speed = 100, Defense = -100 }, Cursed = true, SelfDamage = 0.05, Desc = "<font color='#FF3333'>[CURSED]</font> Insane damage, but you take 5% Max HP damage every time you attack. Halves your Defense." },
+	["Abyssal Thunder Spear"] = { Type = "Weapon", Style = "Thunder Spears", Rarity = "Transcendent", Cost = 1000000, Bonus = { Strength = 800, Speed = -50 }, Cursed = true, SelfDamage = 0.10, Desc = "<font color='#FF3333'>[CURSED]</font> A nuclear payload. You take 10% Max HP damage on launch. Sluggish speed." },
+	["Shroud of the Doomed"] = { Type = "Accessory", Rarity = "Transcendent", Cost = 1000000, Bonus = { Resolve = 500, Health = 500, Defense = 200 }, Cursed = true, NoDodge = true, Desc = "<font color='#FF3333'>[CURSED]</font> Makes you incredibly tanky and immune to stun, but permanently drops your Dodge chance to 0%." }
 }
 
 ItemData.Consumables = {
@@ -46,7 +46,6 @@ ItemData.Consumables = {
 	["Ymir's Clay Fragment"] = { Rarity = "Mythical", Cost = 150000, Action = "AwakenTitan", Desc = "Allows the Attack Titan to reach the Coordinate." },
 	["Titan Hardening Extract"] = { Rarity = "Legendary", Cost = 75000, Desc = "Used in the Forge to Awaken max-tier weapons with random Substats." },
 
-	-- [[ NEW: CRAFTING MATERIALS ]]
 	["Iron Bamboo Heart"] = { Rarity = "Epic", Cost = 3000, IsMaterial = true, Desc = "A rare material extracted from the Titan Forest via Expeditions. Used for complex forging." },
 	["Glowing Titan Crystal"] = { Rarity = "Legendary", Cost = 10000, IsMaterial = true, Desc = "A dense energy crystal found deep in Expeditions. Highly sought after by Hange." },
 	["Abyssal Blood"] = { Rarity = "Mythical", Cost = 50000, IsMaterial = true, Desc = "A terrifying black liquid dropped only by Nightmare Bosses. Used to forge Cursed gear." },
@@ -67,13 +66,11 @@ ItemData.Consumables = {
 	["Backpack Expansion (Gift)"] = { Rarity = "Transcendent", Cost = 0, IsGift = true, Action = "Consume", Buff = "Gamepass", Unlock = "BackpackExpansion", Desc = "Permanently adds +50 slots to your Max Inventory capacity. Cannot be sold." }
 }
 
--- Inject Itemized Titans
 local TitanData = require(script.Parent:WaitForChild("TitanData"))
 for tName, tData in pairs(TitanData.Titans) do
 	ItemData.Consumables["Itemized " .. tName] = { Rarity = tData.Rarity, Cost = 25000, Action = "EquipTitan", TitanName = tName, Desc = "An extracted spine of the " .. tName .. ". Consume to equip it." }
 end
 
--- [[ THE FIX: COMPLEX FORGE TREES ]]
 ItemData.ForgeRecipes = {
 	["Garrison Standard Blades"] = { Result = "Garrison Standard Blades", ReqItems = {["Cadet Training Blade"] = 3}, DewCost = 1500 },
 	["Ultrahard Steel Blades"] = { Result = "Ultrahard Steel Blades", ReqItems = {["Garrison Standard Blades"] = 3, ["Iron Bamboo Heart"] = 1}, DewCost = 4500 },
@@ -94,7 +91,29 @@ ItemData.ForgeRecipes = {
 	["Shroud of the Doomed"] = { Result = "Shroud of the Doomed", ReqItems = {["Commander's Bolo Tie"] = 5, ["Abyssal Blood"] = 3}, DewCost = 5000000 }
 }
 
--- [[ RESTORED: GAMEPASSES ]]
+ItemData.Sets = {
+	["Scout Veteran"] = {
+		Pieces = {Weapon = "Veteran Scout Blades", Accessory = "Scout Regiment Cloak"},
+		Bonus = { DodgeBonus = 15, Speed = 10 },
+		Desc = "Scout Veteran Set: +15% Dodge Chance, +10 Speed"
+	},
+	["Marleyan Warrior"] = {
+		Pieces = {Weapon = "Marleyan Rifle", Accessory = "Marleyan Armband"},
+		Bonus = { IgnoreArmor = 0.20, Strength = 15 },
+		Desc = "Marleyan Warrior Set: 20% Armor Penetration, +15 Strength"
+	},
+	["Commander's Resolve"] = {
+		Pieces = {Weapon = "Iceburst Steel Blades", Accessory = "Erwin's Pendant"},
+		Bonus = { DmgMult = 1.25, MaxHP = 50 },
+		Desc = "Commander's Resolve Set: +25% Total Damage, +50 Max HP"
+	},
+	["Ackerman Blood"] = {
+		Pieces = {Weapon = "Kenny's Custom Pistols", Accessory = "Mikasa's Scarf"},
+		Bonus = { CritBonus = 20, Speed = 30 },
+		Desc = "Ackerman Set: +20% Crit Chance, +30 Speed"
+	}
+}
+
 ItemData.Gamepasses = {
 	{ ID = 1749846514, GiftID = 3562817556, Name = "Auto Train", Desc = "Passively generates Training XP in the background.", Key = "AutoTrain" },
 	{ ID = 1748534838, GiftID = 3562817710, Name = "2x XP & Funds", Desc = "Doubles all XP and Dews gained from combat and training.", Key = "DoubleXP" },
@@ -106,7 +125,6 @@ ItemData.Gamepasses = {
 	{ ID = 1772982444, GiftID = 3564166063, Name = "Backpack Expansion", Desc = "Permanently adds +50 slots to your Max Inventory capacity.", Key = "BackpackExpansion" }
 }
 
--- [[ RESTORED: PRODUCTS ]]
 ItemData.Products = {
 	{ ID = 3557925572, Name = "Shop Reroll", Desc = "Instantly restocks the Military Supply with new items.", IsReroll = true },
 	{ ID = 3557909080, Name = "5,000 Dews", Desc = "A small injection of military funds.", Reward = "Dews", Amount = 5000 },
