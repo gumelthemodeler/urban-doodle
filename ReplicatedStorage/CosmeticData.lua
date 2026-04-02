@@ -1,7 +1,4 @@
 -- @ScriptType: ModuleScript
-
--- @ScriptType: ModuleScript
--- @ScriptType: ModuleScript
 -- @ScriptType: ModuleScript
 local CosmeticData = {}
 
@@ -27,14 +24,12 @@ CosmeticData.Auras = {
 function CosmeticData.CheckUnlock(player, reqType, reqValue)
 	if reqType == "None" then return true end
 
-	-- [[ FIX: Safely check for leaderstats so the client doesn't crash on boot ]]
-	local ls = player:FindFirstChild("leaderstats")
-
+	-- [[ THE FIX: Safely check attributes instead of leaderstats to prevent client-side race conditions ]]
 	if reqType == "Prestige" then
-		local prestige = (ls and ls:FindFirstChild("Prestige")) and ls.Prestige.Value or 0
+		local prestige = player:GetAttribute("Prestige") or 0
 		return prestige >= reqValue
 	elseif reqType == "Elo" then
-		local elo = (ls and ls:FindFirstChild("Elo")) and ls.Elo.Value or 1000
+		local elo = player:GetAttribute("Elo") or 1000
 		return elo >= reqValue
 	elseif reqType == "Achievement" then
 		return player:GetAttribute("Ach_" .. reqValue) == true
