@@ -24,7 +24,7 @@ local requiredRemotes = {
 	"ToggleMute", "CombatAction", "CombatUpdate", "PrestigeEvent", "NotificationEvent", "DungeonUpdate", "WorldBossUpdate", "WorldBossAction", 
 	"RaidAction", "RaidUpdate", "ToggleTraining", "ShopAction", "ShopUpdate", "UpgradeStat", "TrainAction", "EquipItem", "SellItem", "AutoSell", "AdminCommand",
 	"GachaRoll", "GachaRollAuto", "GachaResult", "AwakenAction", "ManageStorage", "VIPFreeReroll", "RedeemCode", "ClaimBounty", "ForgeItem", "ConsumeItem", "JoinRegiment", "ShowRegimentUI",
-	"FuseTitan", "PathsShopBuy", "AwakenWeapon", "DispatchAction", "TradeAction", "TradeUpdate", "TradeRequest", "DeployToDistrict"
+	"FuseTitan", "PathsShopBuy", "AwakenWeapon", "DispatchAction", "TradeAction", "TradeUpdate", "TradeRequest", "DeployToDistrict", "EquipSkill"
 }
 
 for _, remoteName in ipairs(requiredRemotes) do
@@ -72,11 +72,13 @@ lbRf.OnServerInvoke = function(player, lbType)
 	return finalList
 end
 
+-- [[ THE FIX: Added Default Equipped Skills to Data Template ]]
 local DefaultData = { 
 	Prestige = 0, CurrentPart = 1, CurrentMission = 1, CurrentWave = 1, XP = 0, TitanXP = 0, Dews = 0, Elo = 1000, 
 	Titan = "None", FightingStyle = "None", Clan = "None", Regiment = "Cadet Corps", DeployedDistrict = "Trost District",
 	TitanPity = 0, TitanMythicalPity = 0, ClanPity = 0, ClanMythicalPity = 0, 
 	EquippedWeapon = "None", EquippedAccessory = "None", PathDust = 0, PathsFloor = 1, 
+	EquippedSkill_1 = "Basic Slash", EquippedSkill_2 = "Heavy Slash", EquippedSkill_3 = "Maneuver", EquippedSkill_4 = "Recover",
 	DispatchData = "{}", AllyLevels = "{}", UnlockedAllies = "", MaxDeployments = 2, 
 	Health = 10, Strength = 10, Defense = 10, Speed = 10, Gas = 10, Resolve = 10, LastFreeReroll = 0, RedeemedCodes = "",
 	LoginStreak = 0, LastLoginDate = "", AutoTrainSessionTime = 0 
@@ -200,7 +202,7 @@ pcall(function()
 		for _, p in ipairs(Players:GetPlayers()) do
 			local success, backup = pcall(function() return BackupDataStore:GetAsync("Backup_" .. p.UserId) end)
 			if success and backup then
-				pcall(function() GameDataStore:SetAsync(tostring(p.UserId), backup) end)
+				pcall(function() GameDataStore:SetAsync(p.UserId, backup) end)
 				p:Kick("SYSTEM ALARM: A Global Data Rollback has been initiated by Administrators. Your previous safe save has been restored. Please rejoin.")
 			end
 		end
@@ -304,7 +306,6 @@ local function RollBounties(player)
 end
 
 local function LoadPlayer(player)
-	-- [[ ANTI-SESSION OVERLAP: Prevents the new server from loading data before the old server saves ]]
 	task.wait(3.0) 
 	if not player or not player.Parent then return end
 
@@ -312,7 +313,6 @@ local function LoadPlayer(player)
 	local success, savedData
 	local retries = 0
 
-	-- [[ DATASTORE RETRY PROTOCOL ]]
 	repeat
 		success, savedData = pcall(function() return GameDataStore:GetAsync(userIdStr) end)
 		retries += 1
@@ -431,7 +431,6 @@ local function SavePlayer(p, isLeaving)
 		savingPlayers[userIdStr] = true
 	end
 
-	-- [[ IMMEDIATE EXTRACTION: Gather data the exact millisecond the save starts, avoiding destroyed leaderstats ]]
 	local pName = p.Name
 	local dataToSave = {}
 
@@ -456,7 +455,6 @@ local function SavePlayer(p, isLeaving)
 		end 
 	end
 
-	-- [[ THROTTLE PROTECTION ]]
 	local now = os.clock()
 	local lastSave = lastSaveTimes[userIdStr] or 0
 	local timeSince = now - lastSave
@@ -464,13 +462,12 @@ local function SavePlayer(p, isLeaving)
 		if isLeaving then
 			task.wait(6.5 - timeSince)
 		else
-			return -- Skip autosave if too soon
+			return 
 		end
 	end
 
 	lastSaveTimes[userIdStr] = os.clock()
 
-	-- [[ DATASTORE RETRY PROTOCOL ]]
 	local success, err
 	local retries = 0
 	repeat
@@ -509,7 +506,6 @@ game:BindToClose(function()
 		task.spawn(function() SavePlayer(p, true) end) 
 	end 
 
-	-- [[ SAFE SHUTDOWN: Waits for all saves to completely flush before allowing the server to close ]]
 	local waitTime = 0
 	while next(savingPlayers) and waitTime < 25 do
 		task.wait(1)
