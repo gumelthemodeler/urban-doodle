@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GameData = require(ReplicatedStorage:WaitForChild("GameData"))
 local AdminManager = require(ReplicatedStorage:WaitForChild("AdminManager"))
 local CosmeticData = require(ReplicatedStorage:WaitForChild("CosmeticData"))
+local SkillData = require(ReplicatedStorage:WaitForChild("SkillData")) -- [[ NEW: Needed for Skill Validation ]]
 local Network = ReplicatedStorage:WaitForChild("Network")
 local NotificationEvent = Network:WaitForChild("NotificationEvent")
 
@@ -53,20 +54,15 @@ end)
 
 local EquipCosmetic = Network:FindFirstChild("EquipCosmetic") or Instance.new("RemoteEvent", Network)
 EquipCosmetic.Name = "EquipCosmetic"
-
--- [[ THE FIX: Fast-Click Debounce Table ]]
 local equipDebounce = {}
 
 EquipCosmetic.OnServerEvent:Connect(function(player, typeKey, itemKey)
-	-- Blocks rapid double-clicks (like touch-screen bouncing)
 	if equipDebounce[player.UserId] then return end
 	equipDebounce[player.UserId] = true
 
 	local dataPool = typeKey == "Title" and CosmeticData.Titles or CosmeticData.Auras
 	local cData = dataPool[itemKey]
 
-	-- [[ THE FIX: "Already Equipped" Blocker ]]
-	-- If the server sees you already wear it, it drops the request instantly so no duplicate UI notifications send
 	local currentEquipped = player:GetAttribute("Equipped" .. typeKey) or (typeKey == "Title" and "Cadet" or "None")
 
 	if currentEquipped ~= itemKey then
@@ -78,10 +74,32 @@ EquipCosmetic.OnServerEvent:Connect(function(player, typeKey, itemKey)
 		end
 	end
 
-	-- Clear the debounce after a very brief delay
 	task.delay(0.25, function()
 		equipDebounce[player.UserId] = nil
 	end)
+end)
+
+-- [[ THE FIX: Endpoint for Custom Skill Loadouts ]]
+local EquipSkill = Network:FindFirstChild("EquipSkill") or Instance.new("RemoteEvent", Network)
+EquipSkill.Name = "EquipSkill"
+
+EquipSkill.OnServerEvent:Connect(function(player, slotIndex, skillName)
+	slotIndex = tonumber(slotIndex)
+	if not slotIndex or slotIndex < 1 or slotIndex > 4 then return end
+
+	-- Verify skill actually exists in the database
+	if not SkillData.Skills[skillName] then return end
+
+	-- Ensure they aren't equipping duplicates
+	for i = 1, 4 do
+		if player:GetAttribute("EquippedSkill_" .. i) == skillName then
+			NotificationEvent:FireClient(player, "Skill already equipped in slot " .. i .. "!", "Error")
+			return
+		end
+	end
+
+	player:SetAttribute("EquippedSkill_" .. slotIndex, skillName)
+	NotificationEvent:FireClient(player, skillName .. " mapped to Slot " .. slotIndex .. "!", "Success")
 end)
 
 Network:WaitForChild("TrainAction").OnServerEvent:Connect(function(player, combo, isTitan)
