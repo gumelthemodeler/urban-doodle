@@ -200,7 +200,7 @@ pcall(function()
 		for _, p in ipairs(Players:GetPlayers()) do
 			local success, backup = pcall(function() return BackupDataStore:GetAsync("Backup_" .. p.UserId) end)
 			if success and backup then
-				pcall(function() GameDataStore:SetAsync(p.UserId, backup) end)
+				pcall(function() GameDataStore:SetAsync(tostring(p.UserId), backup) end)
 				p:Kick("SYSTEM ALARM: A Global Data Rollback has been initiated by Administrators. Your previous safe save has been restored. Please rejoin.")
 			end
 		end
@@ -304,7 +304,20 @@ local function RollBounties(player)
 end
 
 local function LoadPlayer(player)
-	local success, savedData = pcall(function() return GameDataStore:GetAsync(player.UserId) end)
+	-- [[ ANTI-SESSION OVERLAP: Prevents the new server from loading data before the old server saves ]]
+	task.wait(3.0) 
+	if not player or not player.Parent then return end
+
+	local userIdStr = tostring(player.UserId)
+	local success, savedData
+	local retries = 0
+
+	-- [[ DATASTORE RETRY PROTOCOL ]]
+	repeat
+		success, savedData = pcall(function() return GameDataStore:GetAsync(userIdStr) end)
+		retries += 1
+		if not success then task.wait(1.5) end
+	until success or retries >= 3
 
 	if not success then
 		player:Kick("Roblox DataStores are currently experiencing issues. Please rejoin to protect your save data.")
@@ -312,7 +325,7 @@ local function LoadPlayer(player)
 	end
 
 	if savedData then
-		pcall(function() BackupDataStore:SetAsync("Backup_" .. player.UserId, savedData) end)
+		pcall(function() BackupDataStore:SetAsync("Backup_" .. userIdStr, savedData) end)
 	end
 
 	local data = savedData or DefaultData
@@ -397,15 +410,30 @@ local function LoadPlayer(player)
 	RollBounties(player)
 	player:SetAttribute("DataLoaded", true)
 
-	pcall(function() PrestigeLB:SetAsync(tostring(player.UserId), pVal.Value) end)
-	pcall(function() EloLB:SetAsync(tostring(player.UserId), eVal.Value) end)
+	pcall(function() PrestigeLB:SetAsync(userIdStr, pVal.Value) end)
+	pcall(function() EloLB:SetAsync(userIdStr, eVal.Value) end)
 end
 
 Players.PlayerAdded:Connect(LoadPlayer)
 for _, p in ipairs(Players:GetPlayers()) do task.spawn(function() LoadPlayer(p) end) end
 
-local function SavePlayer(p)
+local lastSaveTimes = {}
+local savingPlayers = {}
+
+local function SavePlayer(p, isLeaving)
+	if not p then return end
 	if not p:GetAttribute("DataLoaded") then return end
+
+	local userIdStr = tostring(p.UserId)
+	if savingPlayers[userIdStr] then return end 
+
+	if isLeaving then
+		savingPlayers[userIdStr] = true
+	end
+
+	-- [[ IMMEDIATE EXTRACTION: Gather data the exact millisecond the save starts, avoiding destroyed leaderstats ]]
+	local pName = p.Name
+	local dataToSave = {}
 
 	local prestigeVal = p:GetAttribute("Prestige") or 0
 	local dewsVal = p:GetAttribute("Dews") or 0
@@ -418,35 +446,73 @@ local function SavePlayer(p)
 		if ls:FindFirstChild("Elo") then eloVal = ls.Elo.Value end
 	end
 
-	local d = { Prestige = prestigeVal, Dews = dewsVal, Elo = eloVal }
+	dataToSave.Prestige = prestigeVal
+	dataToSave.Dews = dewsVal
+	dataToSave.Elo = eloVal
 
 	for k, v in pairs(p:GetAttributes()) do 
 		if k ~= "DataLoaded" and k ~= "InTrade" then 
-			d[k] = v 
+			dataToSave[k] = v 
 		end 
 	end
 
-	-- Back to the exact saving method used in your original script
-	pcall(function() GameDataStore:SetAsync(p.UserId, d) end)
+	-- [[ THROTTLE PROTECTION ]]
+	local now = os.clock()
+	local lastSave = lastSaveTimes[userIdStr] or 0
+	local timeSince = now - lastSave
+	if timeSince < 6.5 then
+		if isLeaving then
+			task.wait(6.5 - timeSince)
+		else
+			return -- Skip autosave if too soon
+		end
+	end
 
-	pcall(function() PrestigeLB:SetAsync(tostring(p.UserId), prestigeVal) end)
-	pcall(function() EloLB:SetAsync(tostring(p.UserId), eloVal) end)
+	lastSaveTimes[userIdStr] = os.clock()
+
+	-- [[ DATASTORE RETRY PROTOCOL ]]
+	local success, err
+	local retries = 0
+	repeat
+		success, err = pcall(function() GameDataStore:SetAsync(userIdStr, dataToSave) end)
+		retries += 1
+		if not success then task.wait(1.5) end
+	until success or retries >= 3
+
+	if not success then
+		warn("[DataManager] CRITICAL: Failed to save " .. pName .. " Data after 3 retries! Error: " .. tostring(err))
+	end
+
+	pcall(function() PrestigeLB:SetAsync(userIdStr, dataToSave.Prestige or 0) end)
+	pcall(function() EloLB:SetAsync(userIdStr, dataToSave.Elo or 1000) end)
+
+	if isLeaving then
+		savingPlayers[userIdStr] = nil
+	end
 end
 
-Players.PlayerRemoving:Connect(SavePlayer)
+Players.PlayerRemoving:Connect(function(p)
+	SavePlayer(p, true)
+end)
 
 task.spawn(function() 
 	while true do 
 		task.wait(120) 
 		for _, p in ipairs(Players:GetPlayers()) do 
-			task.spawn(function() SavePlayer(p) end) 
+			task.spawn(function() SavePlayer(p, false) end) 
 		end 
 	end 
 end)
 
 game:BindToClose(function() 
 	for _, p in ipairs(Players:GetPlayers()) do 
-		task.spawn(function() SavePlayer(p) end) 
+		task.spawn(function() SavePlayer(p, true) end) 
 	end 
-	task.wait(3) 
+
+	-- [[ SAFE SHUTDOWN: Waits for all saves to completely flush before allowing the server to close ]]
+	local waitTime = 0
+	while next(savingPlayers) and waitTime < 25 do
+		task.wait(1)
+		waitTime += 1
+	end
 end)
