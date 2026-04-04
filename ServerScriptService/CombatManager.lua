@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local EnemyData = require(ReplicatedStorage:WaitForChild("EnemyData"))
 local ItemData = require(ReplicatedStorage:WaitForChild("ItemData"))
 local SkillData = require(ReplicatedStorage:WaitForChild("SkillData"))
+local ClanData = require(ReplicatedStorage:WaitForChild("ClanData"))
 local CombatCore = require(script.Parent:WaitForChild("CombatCore"))
 local LootManager = require(script.Parent:WaitForChild("LootManager")) 
 
@@ -43,7 +44,6 @@ local function GetTemplate(partData, templateName)
 	return partData.Mobs[1] 
 end
 
--- Used for standard mobs and endless to allow player progression to feel "overpowered"
 local function GetHPScale(targetPart, prestige)
 	local chapterScale = math.pow(1.20, targetPart - 1) 
 	local prestigeScale = math.pow(1.25, prestige) 
@@ -194,10 +194,13 @@ local function StartBattle(player, encounterType, requestedPartId)
 	local combinedAwakenedString = wpnAwakenedString .. " | " .. pathsAwakenedString
 	local awakenedStats = ParseAwakenedStats(combinedAwakenedString)
 
+	-- [[ HEALTH BUG FIX: Actually apply Clan HP Multiplier to Player max health ]]
 	local clanName = player:GetAttribute("Clan") or "None"
+	local isAwakenedClan = string.find(tostring(clanName or ""), "Awakened") ~= nil
+	local cStats = ClanData.GetClanStats(clanName, isAwakenedClan, player:GetAttribute("Titan"), false)
 
 	local pMaxHP = ((player:GetAttribute("Health") or 10) + (wpnBonus.Health or 0) + (accBonus.Health or 0)) * 10
-	pMaxHP = pMaxHP + awakenedStats.HpBonus
+	pMaxHP = math.floor((pMaxHP + awakenedStats.HpBonus) * cStats.HpMult)
 
 	local pMaxGas = ((player:GetAttribute("Gas") or 10) + (wpnBonus.Gas or 0) + (accBonus.Gas or 0)) * 10
 	pMaxGas = pMaxGas + awakenedStats.GasBonus
@@ -224,52 +227,45 @@ local function StartBattle(player, encounterType, requestedPartId)
 	local eDef = math.floor(eTemplate.Defense * dmgMult)
 	local eSpd = math.floor(eTemplate.Speed * spdMult)
 
-	-- [[ THE DYNAMIC ENCOUNTER ENGINE ]]
-	-- Overwrites static math with purely dynamic, player-relative ratio math.
+	-- [[ FIX: 1-SHOT & BOSS HP OVERHAUL (DYNAMIC ENCOUNTER CLAMPING) ]]
 	local isDynamicBoss = (encounterType == "EngageWorldBoss" or encounterType == "EngageNightmare" or encounterType == "EngageRaid")
 
 	if isDynamicBoss then
-		-- Group Multiplier Detection
 		local groupMult = 1
 		if encounterType == "EngageWorldBoss" then
 			groupMult = math.clamp(#Players:GetPlayers(), 1, 15)
 		elseif encounterType == "EngageRaid" then
-			local partyId = player:GetAttribute("PartyID")
-			if partyId then
-				local pCount = 0
-				for _, p in ipairs(Players:GetPlayers()) do
-					if p:GetAttribute("PartyID") == partyId then pCount += 1 end
-				end
-				groupMult = math.clamp(pCount, 1, 4)
+			local getPartyFunc = Network:FindFirstChild("GetPlayerParty")
+			if getPartyFunc then
+				local partyData = getPartyFunc:Invoke(player)
+				if partyData and partyData.Members then groupMult = #partyData.Members end
 			end
 		end
 
-		-- Base Encounter Type Weights
 		local baseDifficulty = 1.0
-		if encounterType == "EngageWorldBoss" then baseDifficulty = 2.5
-		elseif encounterType == "EngageNightmare" then baseDifficulty = 1.8
+		if encounterType == "EngageWorldBoss" then baseDifficulty = 2.0
+		elseif encounterType == "EngageNightmare" then baseDifficulty = 1.5
 		elseif encounterType == "EngageRaid" then baseDifficulty = 1.2 end
 
-		-- DYNAMIC HP: Boss will always take exactly 15-30 unmitigated hits to kill based on difficulty and group size.
-		local effectivePlayerDmg = math.max(10, pTotalStr * (awakenedStats.DmgMult or 1.0) * (1 + (prestige * 0.15)))
-		local bossHPRatio = math.clamp(eTemplate.Health / 5000, 0.5, 10.0)
-		eHP = math.floor(effectivePlayerDmg * 15 * baseDifficulty * groupMult * bossHPRatio)
+		-- DYNAMIC HP: Math clamped heavily to prevent 200k HP bloat
+		local effectivePlayerDmg = math.max(10, pTotalStr * (awakenedStats.DmgMult or 1.0) * (1 + (prestige * 0.1)))
+		local bossHPRatio = math.clamp(eTemplate.Health / 4000, 0.5, 2.5) 
+		eHP = math.floor(effectivePlayerDmg * 15 * baseDifficulty * math.pow(groupMult, 0.75) * bossHPRatio)
 
 		if eGateType == "Steam" then
-			eGateHP = eTemplate.GateHP -- Fixed hit count limit
+			eGateHP = eTemplate.GateHP 
 		elseif eGateType then
 			local gateRatio = (eTemplate.GateHP or 0) / eTemplate.Health
 			eGateHP = math.floor(eHP * gateRatio)
 		end
 
-		-- DYNAMIC LETHALITY: Boss will always kill you in ~6-8 hits if you don't mitigate/dodge.
-		local effectivePlayerDurability = pMaxHP + (pTotalDef * 3)
-		local bossDmgRatio = math.clamp(eTemplate.Strength / 200, 0.5, 4.0)
-		eStr = math.floor((effectivePlayerDurability / 6) * baseDifficulty * bossDmgRatio)
+		-- DYNAMIC LETHALITY: Capped ratio scaling prevents random 1-shots. Forces an 8-hit kill requirement.
+		local effectivePlayerDurability = pMaxHP + (pTotalDef * 2)
+		local bossDmgRatio = math.clamp(eTemplate.Strength / 300, 0.5, 2.0) 
+		eStr = math.floor((effectivePlayerDurability / 8) * baseDifficulty * bossDmgRatio)
 
-		-- DYNAMIC STATS: Prevent defensive walls from dropping boss hit chance to 0%.
-		local bossDefRatio = math.clamp(eTemplate.Defense / 100, 0.5, 4.0)
-		eDef = math.floor(pTotalStr * 0.8 * bossDefRatio * baseDifficulty)
+		local bossDefRatio = math.clamp(eTemplate.Defense / 150, 0.5, 2.0)
+		eDef = math.floor(pTotalStr * 0.5 * bossDefRatio * baseDifficulty)
 		eSpd = math.floor(pTotalSpd * 1.1)
 
 		logFlavor = logFlavor .. "\n<font color='#AAAAAA'>[Dynamic Encounter: Boss attuned to Group Size " .. groupMult .. "x]</font>"
@@ -574,12 +570,22 @@ local function ProcessEnemyDeath(player, battle)
 	end
 end
 
+-- [[ FIX: Added Missing MinigameResult Handler Check ]]
 CombatAction.OnServerEvent:Connect(function(player, actionType, actionData)
 	if actionType == "EngageRandom" or actionType == "EngageStory" or actionType == "EngageEndless" or actionType == "EngagePaths" or actionType == "EngageWorldBoss" or actionType == "EngageNightmare" then 
 		local pId = actionData and (actionData.PartId or actionData.BossId) or nil; StartBattle(player, actionType, pId); return 
 	end
 
 	if actionType == "MinigameResult" then
+		local battle = ActiveBattles[player.UserId]
+		if not battle or not battle.Enemy.IsMinigame then return end
+
+		if actionData.Success then
+			ProcessEnemyDeath(player, battle)
+		else
+			CombatUpdate:FireClient(player, "Defeat", {Battle = battle})
+			ActiveBattles[player.UserId] = nil
+		end
 		return
 	end
 
