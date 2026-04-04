@@ -9,7 +9,7 @@ local Players = game:GetService("Players")
 local DataStoreService = game:GetService("DataStoreService")
 local ItemData = require(ReplicatedStorage:WaitForChild("ItemData"))
 local GameData = require(ReplicatedStorage:WaitForChild("GameData")) 
-local GameDataStore = DataStoreService:GetDataStore("AoT_Data_V5") 
+local GameDataStore = DataStoreService:GetDataStore("AoT_Data_V6") 
 
 local Network = ReplicatedStorage:WaitForChild("Network")
 local GetShopData = Network:WaitForChild("GetShopData")
@@ -284,3 +284,21 @@ MarketplaceService.ProcessReceipt = function(receiptInfo)
 	end
 	return Enum.ProductPurchaseDecision.PurchaseGranted
 end
+
+MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, gamePassId, wasPurchased)
+	if wasPurchased then
+		for _, gp in ipairs(ItemData.Gamepasses) do
+			if gp.ID == gamePassId then
+				player:SetAttribute("Has" .. gp.Key, true)
+				NotificationEvent:FireClient(player, "Purchased " .. gp.Name .. "!", "Success")
+
+				task.spawn(function()
+					local d = { Prestige = player.leaderstats.Prestige.Value, Dews = player.leaderstats.Dews.Value, Elo = player.leaderstats.Elo.Value }
+					for k, v in pairs(player:GetAttributes()) do if k ~= "DataLoaded" then d[k] = v end end
+					pcall(function() GameDataStore:SetAsync(player.UserId, d) end)
+				end)
+				break
+			end
+		end
+	end
+end)
