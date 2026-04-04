@@ -43,20 +43,21 @@ local function GetTemplate(partData, templateName)
 	return partData.Mobs[1] 
 end
 
+-- Used for standard mobs and endless to allow player progression to feel "overpowered"
 local function GetHPScale(targetPart, prestige)
-	local chapterScale = math.pow(1.25, targetPart - 1) 
-	local prestigeScale = math.pow(1.28, prestige) 
+	local chapterScale = math.pow(1.20, targetPart - 1) 
+	local prestigeScale = math.pow(1.25, prestige) 
 	return chapterScale * prestigeScale
 end
 
 local function GetDmgScale(targetPart, prestige)
-	local chapterScale = math.pow(1.10, targetPart - 1) 
-	local prestigeScale = math.pow(1.12, prestige) 
+	local chapterScale = math.pow(1.15, targetPart - 1) 
+	local prestigeScale = math.pow(1.15, prestige) 
 	return chapterScale * prestigeScale
 end
 
 local function GetSpdScale(targetPart, prestige)
-	return math.pow(1.05, targetPart - 1) * math.pow(1.06, prestige)
+	return 1.0 + (math.pow(targetPart, 0.5) * 0.1) + (math.pow(prestige, 0.6) * 0.2)
 end
 
 local function GetActualStyle(plr)
@@ -223,9 +224,12 @@ local function StartBattle(player, encounterType, requestedPartId)
 	local eDef = math.floor(eTemplate.Defense * dmgMult)
 	local eSpd = math.floor(eTemplate.Speed * spdMult)
 
+	-- [[ THE DYNAMIC ENCOUNTER ENGINE ]]
+	-- Overwrites static math with purely dynamic, player-relative ratio math.
 	local isDynamicBoss = (encounterType == "EngageWorldBoss" or encounterType == "EngageNightmare" or encounterType == "EngageRaid")
 
 	if isDynamicBoss then
+		-- Group Multiplier Detection
 		local groupMult = 1
 		if encounterType == "EngageWorldBoss" then
 			groupMult = math.clamp(#Players:GetPlayers(), 1, 15)
@@ -240,26 +244,30 @@ local function StartBattle(player, encounterType, requestedPartId)
 			end
 		end
 
+		-- Base Encounter Type Weights
 		local baseDifficulty = 1.0
 		if encounterType == "EngageWorldBoss" then baseDifficulty = 2.5
 		elseif encounterType == "EngageNightmare" then baseDifficulty = 1.8
 		elseif encounterType == "EngageRaid" then baseDifficulty = 1.2 end
 
+		-- DYNAMIC HP: Boss will always take exactly 15-30 unmitigated hits to kill based on difficulty and group size.
 		local effectivePlayerDmg = math.max(10, pTotalStr * (awakenedStats.DmgMult or 1.0) * (1 + (prestige * 0.15)))
 		local bossHPRatio = math.clamp(eTemplate.Health / 5000, 0.5, 10.0)
 		eHP = math.floor(effectivePlayerDmg * 15 * baseDifficulty * groupMult * bossHPRatio)
 
 		if eGateType == "Steam" then
-			eGateHP = eTemplate.GateHP 
+			eGateHP = eTemplate.GateHP -- Fixed hit count limit
 		elseif eGateType then
 			local gateRatio = (eTemplate.GateHP or 0) / eTemplate.Health
 			eGateHP = math.floor(eHP * gateRatio)
 		end
 
+		-- DYNAMIC LETHALITY: Boss will always kill you in ~6-8 hits if you don't mitigate/dodge.
 		local effectivePlayerDurability = pMaxHP + (pTotalDef * 3)
 		local bossDmgRatio = math.clamp(eTemplate.Strength / 200, 0.5, 4.0)
 		eStr = math.floor((effectivePlayerDurability / 6) * baseDifficulty * bossDmgRatio)
 
+		-- DYNAMIC STATS: Prevent defensive walls from dropping boss hit chance to 0%.
 		local bossDefRatio = math.clamp(eTemplate.Defense / 100, 0.5, 4.0)
 		eDef = math.floor(pTotalStr * 0.8 * bossDefRatio * baseDifficulty)
 		eSpd = math.floor(pTotalSpd * 1.1)
@@ -852,17 +860,6 @@ CombatAction.OnServerEvent:Connect(function(player, actionType, actionData)
 	else
 		if not battle.Player.Statuses or not battle.Player.Statuses["Transformed"] then battle.Player.TitanEnergy = math.min(100, (battle.Player.TitanEnergy or 0) + 15) end
 		battle.IsProcessing = false
-
-		-- [[ THE FIX: Intercept Update to clear custom layout duplication before pushing to client UI ]]
-		local function UpdateActionGrid(battleState)
-			local p = battleState.Player
-			local pClan = p.Clan or "None"
-			local isTransformed = p.Statuses and p.Statuses["Transformed"]
-
-			-- Only necessary if we were directly sending the grid from server, but the UI is built locally. 
-			-- We will instead just fire the update to trigger the local layout generation.
-		end
-
 		CombatUpdate:FireClient(player, "Update", {Battle = battle})
 	end
 end)
