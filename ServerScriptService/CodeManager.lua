@@ -38,6 +38,13 @@ local ActiveCodes = {
 			["Standard Titan Serum"] = 15,
 			["Clan Blood Vial"] = 15 
 		}
+	},
+	["BUGFIX2"] = { 
+		Dews = 3000,
+		Items = {
+			["Standard Titan Serum"] = 15,
+			["Clan Blood Vial"] = 15 
+		}
 	}
 }
 
