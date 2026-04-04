@@ -13,6 +13,7 @@ local EnemyData = require(ReplicatedStorage:WaitForChild("EnemyData"))
 local ItemData = require(ReplicatedStorage:WaitForChild("ItemData"))
 local SkillData = require(ReplicatedStorage:WaitForChild("SkillData"))
 local CombatCore = require(script.Parent:WaitForChild("CombatCore"))
+local ClanData = require(ReplicatedStorage:WaitForChild("ClanData"))
 
 local ActiveRaids = {}
 local TURN_DURATION = 15
@@ -24,7 +25,7 @@ local function CreateCombatant(player)
 	local accName = player:GetAttribute("EquippedAccessory") or "None"
 	local wpnBonus = (ItemData.Equipment[wpnName] and ItemData.Equipment[wpnName].Bonus) or {}
 	local accBonus = (ItemData.Equipment[accName] and ItemData.Equipment[accName].Bonus) or {}
-
+	
 	local safeWpnName = wpnName:gsub("[^%w]", "")
 	local awakenedString = player:GetAttribute(safeWpnName .. "_Awakened")
 	local awakenedStats = { DmgMult = 1.0, DodgeBonus = 0, CritBonus = 0, HpBonus = 0, SpdBonus = 0, GasBonus = 0, HealOnKill = 0, IgnoreArmor = 0 }
