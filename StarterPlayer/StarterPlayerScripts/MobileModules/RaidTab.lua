@@ -508,8 +508,21 @@ function RaidTab.Init(parentFrame, tooltipMgr)
 				if EffectsManager and type(EffectsManager.PlaySFX) == "function" then EffectsManager.PlaySFX("Defeat", 1) end 
 			end
 			AddLogMessage("<font color='#FF5555'><b>RAID CONCLUDED.</b></font>", true)
+
+			TargetMenu.Visible = false
 			ActionGrid.Visible = false
 			LeaveBtn.Visible = true
+		end
+	end)
+
+	-- Fix the Leave Button for touch support 
+	LeaveBtn.Activated:Connect(function()
+		EffectsManager.PlaySFX("Click")
+		ArenaFrame.Visible = false; parentFrame.Visible = true 
+		local topGui = parentFrame:FindFirstAncestorOfClass("ScreenGui")
+		if topGui then
+			if topGui:FindFirstChild("TopBar") then topGui.TopBar.Visible = true end
+			if topGui:FindFirstChild("NavBar") then topGui.NavBar.Visible = true end
 		end
 	end)
 end
