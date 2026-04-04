@@ -812,7 +812,7 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 
 	-- [[ NEW: Event Listeners for Cosmetic Tracker ]]
 	player.AttributeChanged:Connect(function(attr)
-		if string.match(attr, "^Ach_") or attr == "Titan" or string.match(attr, "^Equipped") then
+		if string.match(attr, "^Ach_") or attr == "Titan" or string.match(attr, "^Equipped") or attr == "Prestige" or attr == "Elo" then
 			EvaluateCosmeticUnlocks()
 		end
 		RefreshProfile()
