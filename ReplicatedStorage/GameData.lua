@@ -94,7 +94,9 @@ function GameData.GetInventoryCount(player)
 	local attrs = player:GetAttributes()
 	for key, val in pairs(attrs) do
 		if type(val) == "number" and val > 0 and string.sub(key, -5) == "Count" then
-			if not ignoredKeys[key] then count += val end
+			if not ignoredKeys[key] then 
+				count += 1 -- [[ FIX: Add 1 for the slot used, NOT the stack amount (val) ]]
+			end
 		end
 	end
 	return count
