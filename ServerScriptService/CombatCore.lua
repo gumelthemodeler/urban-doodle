@@ -109,24 +109,20 @@ function CombatCore.CalculateDamage(attacker, defender, skillMult, targetLimb)
 		defBuff = defBuff * (1.0 + (titanHardening / 35.0))
 	end
 
-	-- 4. PLAYER-SPECIFIC MULTIPLIERS (Clans, Sets, Prestige, Awakened/Paths)
+	-- 4. PLAYER-SPECIFIC MULTIPLIERS
 	if attacker.IsPlayer then
-		-- Clan Lineages
 		local aStats = ClanData.GetClanStats(attacker.Clan, string.find(tostring(attacker.Clan or ""), "Awakened"), attacker.Titan, isAttackerTransformed)
 		atkBuff = atkBuff * aStats.DmgMult
 
-		-- Item Sets
 		local setBonus = GetSetBonus(attacker.PlayerObj)
 		if setBonus then
 			if setBonus.DmgMult then atkBuff = atkBuff * setBonus.DmgMult end
 			if setBonus.IgnoreArmor then armorPen = armorPen + setBonus.IgnoreArmor end
 		end
 
-		-- Consumable Buffs
 		local expiry = attacker.PlayerObj and tonumber(attacker.PlayerObj:GetAttribute("Buff_Damage_Expiry")) or 0
 		if expiry > os.time() then atkBuff = atkBuff * 1.5 end
 
-		-- Prestige Nodes
 		local prestigeDmg = tonumber(attacker.PlayerObj:GetAttribute("Prestige_DmgMult")) or 0
 		atkBuff = atkBuff * (1.0 + prestigeDmg)
 		armorPen = armorPen + (tonumber(attacker.PlayerObj:GetAttribute("Prestige_IgnoreArmor")) or 0)
@@ -137,7 +133,7 @@ function CombatCore.CalculateDamage(attacker, defender, skillMult, targetLimb)
 		defBuff = defBuff * dStats.ArmorMult
 	end
 
-	-- 5. AWAKENED WEAPONS AND PATHS NODES (Passed in from CombatManager)
+	-- 5. AWAKENED WEAPONS AND PATHS NODES
 	if attacker.AwakenedStats then
 		if (tonumber(attacker.AwakenedStats.DmgMult) or 1.0) > 1.0 then atkBuff = atkBuff * tonumber(attacker.AwakenedStats.DmgMult) end
 		if (tonumber(attacker.AwakenedStats.IgnoreArmor) or 0) > 0 then armorPen = armorPen + tonumber(attacker.AwakenedStats.IgnoreArmor) end
@@ -150,13 +146,13 @@ function CombatCore.CalculateDamage(attacker, defender, skillMult, targetLimb)
 	local effectiveAttack = atkStrength * atkBuff
 	local effectiveDefense = defArmor * defBuff
 
-	-- [[ THE PERMANENT FIX: LOGARITHMIC SOFT-CAPS ]]
-	-- No matter how many multipliers a player stacks from the steps above, the exponent
-	-- gracefully curves the math to prevent infinite damage explosions and 1-shots.
+	-- [[ THE PERMANENT FIX: EXTREME ENEMY SQUISH ]]
+	-- Forces enemies to abide by harsh logarithmic soft-caps. 
+	-- A boss with 5,000 raw attack will be squished into roughly 800 effective attack.
 	if attacker.IsPlayer then
 		effectiveAttack = math.pow(effectiveAttack, 0.70) * 6
 	else
-		effectiveAttack = math.pow(effectiveAttack, 0.85) * 2.5
+		effectiveAttack = math.pow(effectiveAttack, 0.60) * 5
 	end
 
 	effectiveDefense = math.pow(effectiveDefense, 0.80) * 2
@@ -188,7 +184,7 @@ function CombatCore.CalculateDamage(attacker, defender, skillMult, targetLimb)
 	if defender.Name == "Abyssal Armored Titan" then
 		local aStyle = tostring(attacker.Style or "None")
 		if attacker.IsPlayer and not isAttackerTransformed and (aStyle == "Ultrahard Steel Blades" or aStyle == "None") then
-			baseDmg = math.pow(baseDmg, 0.65) -- Deflects basic blade attacks
+			baseDmg = math.pow(baseDmg, 0.65)
 		end
 	end
 
