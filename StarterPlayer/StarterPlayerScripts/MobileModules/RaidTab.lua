@@ -237,13 +237,15 @@ function RaidTab.Init(parentFrame, tooltipMgr)
 	LeaveBtn = Instance.new("TextButton", ArenaFrame); LeaveBtn.Size = UDim2.new(0.6, 0, 0, 45); LeaveBtn.LayoutOrder = 5; LeaveBtn.Font = Enum.Font.GothamBlack; LeaveBtn.TextColor3 = Color3.fromRGB(255, 255, 255); LeaveBtn.TextSize = 16; LeaveBtn.Text = "LEAVE ARENA"; LeaveBtn.Visible = false
 	ApplyButtonGradient(LeaveBtn, Color3.fromRGB(80, 180, 80), Color3.fromRGB(40, 100, 40), Color3.fromRGB(20, 80, 20))
 
-	LeaveBtn.MouseButton1Click:Connect(function()
-		EffectsManager.PlaySFX("Click")
-		ArenaFrame.Visible = false; parentFrame.Visible = true 
-		local topGui = parentFrame:FindFirstAncestorOfClass("ScreenGui")
-		if topGui then
-			if topGui:FindFirstChild("TopBar") then topGui.TopBar.Visible = true end
-			if topGui:FindFirstChild("NavBar") then topGui.NavBar.Visible = true end
+	LeaveBtn.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			EffectsManager.PlaySFX("Click")
+			ArenaFrame.Visible = false; parentFrame.Visible = true 
+			local topGui = parentFrame:FindFirstAncestorOfClass("ScreenGui")
+			if topGui then
+				if topGui:FindFirstChild("TopBar") then topGui.TopBar.Visible = true end
+				if topGui:FindFirstChild("NavBar") then topGui.NavBar.Visible = true end
+			end
 		end
 	end)
 
@@ -512,17 +514,6 @@ function RaidTab.Init(parentFrame, tooltipMgr)
 			TargetMenu.Visible = false
 			ActionGrid.Visible = false
 			LeaveBtn.Visible = true
-		end
-	end)
-
-	-- Fix the Leave Button for touch support 
-	LeaveBtn.Activated:Connect(function()
-		EffectsManager.PlaySFX("Click")
-		ArenaFrame.Visible = false; parentFrame.Visible = true 
-		local topGui = parentFrame:FindFirstAncestorOfClass("ScreenGui")
-		if topGui then
-			if topGui:FindFirstChild("TopBar") then topGui.TopBar.Visible = true end
-			if topGui:FindFirstChild("NavBar") then topGui.NavBar.Visible = true end
 		end
 	end)
 end
