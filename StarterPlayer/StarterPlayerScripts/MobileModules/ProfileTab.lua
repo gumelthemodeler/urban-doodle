@@ -37,23 +37,18 @@ local SellValues = { Common = 10, Uncommon = 25, Rare = 75, Epic = 200, Legendar
 local TEXT_COLORS = { PrestigeYellow = "#FFD700", EloBlue = "#55AAFF", DefaultGreen = "#55FF55" }
 local REG_COLORS = { ["Garrison"] = "#FF5555", ["Military Police"] = "#55FF55", ["Scout Regiment"] = "#55AAFF" }
 
--- [[ NEW: Cosmetics Tracker Cache ]]
+-- [[ COSMETICS TRACKER CACHE ]]
 local UnlockedCosmeticsCache = { Titles = {}, Auras = {} }
 local CosmeticUIUpdaters = {}
+local hasInitiallyPopulatedCache = false
 
-task.spawn(function()
-	player:WaitForChild("leaderstats", 10)
-	for key, data in pairs(CosmeticData.Titles) do UnlockedCosmeticsCache.Titles[key] = CosmeticData.CheckUnlock(player, data.ReqType, data.ReqValue) end
-	for key, data in pairs(CosmeticData.Auras) do UnlockedCosmeticsCache.Auras[key] = CosmeticData.CheckUnlock(player, data.ReqType, data.ReqValue) end
-end)
-
-local function EvaluateCosmeticUnlocks()
+local function EvaluateCosmeticUnlocks(silent)
 	-- Check Titles
 	for key, data in pairs(CosmeticData.Titles) do
 		if not UnlockedCosmeticsCache.Titles[key] then
 			if CosmeticData.CheckUnlock(player, data.ReqType, data.ReqValue) then
 				UnlockedCosmeticsCache.Titles[key] = true
-				if NotificationManager then NotificationManager.Show("New Title Unlocked: " .. data.Name, "Success") end
+				if not silent and NotificationManager then NotificationManager.Show("New Title Unlocked: " .. data.Name, "Success") end
 			end
 		end
 	end
@@ -62,7 +57,7 @@ local function EvaluateCosmeticUnlocks()
 		if not UnlockedCosmeticsCache.Auras[key] then
 			if CosmeticData.CheckUnlock(player, data.ReqType, data.ReqValue) then
 				UnlockedCosmeticsCache.Auras[key] = true
-				if NotificationManager then NotificationManager.Show("New Aura Unlocked: " .. data.Name, "Success") end
+				if not silent and NotificationManager then NotificationManager.Show("New Aura Unlocked: " .. data.Name, "Success") end
 			end
 		end
 	end
@@ -459,6 +454,8 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 	BuildCosmeticList(SubTabs["Auras"], "Aura", CosmeticData.Auras)
 	aLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() SubTabs["Auras"].CanvasSize = UDim2.new(0, 0, 0, aLayout.AbsoluteContentSize.Y + 30) end)
 
+
+	-- [[ GLOBAL UPDATE LOGIC ]]
 	titanAwakenBtn.MouseButton1Click:Connect(function() Network.AwakenAction:FireServer("Titan") end)
 	clanAwakenBtn.MouseButton1Click:Connect(function() Network.AwakenAction:FireServer("Clan") end)
 	prestigeBtn.MouseButton1Click:Connect(function() Network.PrestigeEvent:FireServer() end)
@@ -808,12 +805,23 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 
 		InvTitle.Text = "INVENTORY (" .. currentSlotsUsed .. "/" .. MAX_INVENTORY_CAPACITY .. ")"
 		if currentSlotsUsed >= MAX_INVENTORY_CAPACITY then InvTitle.TextColor3 = Color3.fromRGB(255, 100, 100) else InvTitle.TextColor3 = Color3.fromRGB(255, 215, 100) end
+
+		task.delay(0.05, function() InvGrid.CanvasSize = UDim2.new(0, 0, 0, math.ceil(layoutOrderCounter / 6) * 95) end)
+
+		-- [[ THE PERMANENT UI COSMETIC FIX: Forces buttons to update to latest reality ]]
+		for _, updater in ipairs(CosmeticUIUpdaters) do
+			updater()
+		end
 	end
 
-	-- [[ NEW: Event Listeners for Cosmetic Tracker ]]
 	player.AttributeChanged:Connect(function(attr)
-		if string.match(attr, "^Ach_") or attr == "Titan" or string.match(attr, "^Equipped") or attr == "Prestige" or attr == "Elo" then
-			EvaluateCosmeticUnlocks()
+		if attr == "DataLoaded" and not hasInitiallyPopulatedCache then
+			hasInitiallyPopulatedCache = true
+			EvaluateCosmeticUnlocks(true) -- Silent population so they don't get spammed on joining
+		elseif string.match(attr, "^Ach_") or attr == "Titan" or string.match(attr, "^Equipped") or attr == "Prestige" or attr == "Elo" then
+			if hasInitiallyPopulatedCache then
+				EvaluateCosmeticUnlocks(false)
+			end
 		end
 		RefreshProfile()
 	end)
@@ -825,12 +833,18 @@ function ProfileTab.Init(parentFrame, tooltipMgr)
 				if child:IsA("IntValue") then
 					child.Changed:Connect(function()
 						if child.Name == "Prestige" or child.Name == "Elo" then
-							EvaluateCosmeticUnlocks()
+							if hasInitiallyPopulatedCache then EvaluateCosmeticUnlocks(false) end
 						end
 						RefreshProfile()
 					end)
 				end
 			end
+		end
+
+		-- Fallback just in case script started slightly late and DataLoaded already fired
+		if player:GetAttribute("DataLoaded") and not hasInitiallyPopulatedCache then
+			hasInitiallyPopulatedCache = true
+			EvaluateCosmeticUnlocks(true)
 		end
 		RefreshProfile()
 	end)
