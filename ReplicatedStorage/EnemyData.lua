@@ -165,7 +165,7 @@ EnemyData.Parts = {
 		Mobs = { { Name = "Wall Titan", Health = 400, Strength = 250, Defense = 80, Speed = 20, Resolve = 60, TitanStats = emptyTitans, Skills = {"Colossal Steam", "Stomp", "Brutal Swipe"}, Drops = { Dews = 1000, XP = 1200, ItemChance = {["Spinal Fluid Syringe"]=1} } } },
 		Templates = {
 			["Wall Titan"] = { Name = "Wall Titan", Health = 400, GateType = "Steam", GateHP = 2, Strength = 250, Defense = 80, Speed = 20, Resolve = 60, TitanStats = emptyTitans, Skills = {"Colossal Steam", "Stomp"}, Drops = { Dews = 1000, XP = 1200, ItemChance = {["Spinal Fluid Syringe"]=1} } },
-			["Ancient Shifter"] = { Name = "Ancient Nine Titan Husk", Health = 600, Strength = 200, Defense = 100, Speed = 100, Resolve = 100, TitanStats = emptyTitans, Skills = {"Armored Tackle", "War Hammer Spike", "Titan Bite"}, Drops = { Dews = 1200, XP = 2000, ItemChance = {["Standard Titan Serum"]=2, ["Ymir's Clay Fragment"]=1} } },
+			["Ancient Shifter"] = { Name = "Ancient Nine Titan Husk", Health = 600, Strength = 100, Defense = 100, Speed = 100, Resolve = 100, TitanStats = emptyTitans, Skills = {"Armored Tackle", "War Hammer Spike", "Titan Bite"}, Drops = { Dews = 1200, XP = 2000, ItemChance = {["Standard Titan Serum"]=2, ["Ymir's Clay Fragment"]=1} } },
 			["Part8Boss"] = { 
 				IsBoss = true, Name = "Founding Titan", Health = 3500, GateType = "Steam", GateHP = 3, Strength = 350, Defense = 150, Speed = 15, Resolve = 150, TitanStats = {Power="S", Speed="E", Hardening="S", Endurance="S", Precision="S", Potential="S"}, 
 				Skills = {"Coordinate Command", "Colossal Steam", "War Hammer Spike"}, Drops = { Dews = 6000, XP = 35000, ItemChance = { ["Ymir's Clay Fragment"] = 2, ["Spinal Fluid Syringe"] = 5, ["Glowing Titan Crystal"] = 5 } },
