@@ -44,20 +44,21 @@ local function GetTemplate(partData, templateName)
 	return partData.Mobs[1] 
 end
 
+-- [[ THE FIX: Flattened all exponential math to strictly Linear equations ]]
 local function GetHPScale(targetPart, prestige)
-	local chapterScale = math.pow(1.20, targetPart - 1) 
-	local prestigeScale = math.pow(1.25, prestige) 
+	local chapterScale = 1.0 + ((targetPart - 1) * 0.20) 
+	local prestigeScale = 1.0 + (prestige * 0.15) 
 	return chapterScale * prestigeScale
 end
 
 local function GetDmgScale(targetPart, prestige)
-	local chapterScale = math.pow(1.15, targetPart - 1) 
-	local prestigeScale = math.pow(1.15, prestige) 
+	local chapterScale = 1.0 + ((targetPart - 1) * 0.15) 
+	local prestigeScale = 1.0 + (prestige * 0.10) 
 	return chapterScale * prestigeScale
 end
 
 local function GetSpdScale(targetPart, prestige)
-	return 1.0 + (math.pow(targetPart, 0.5) * 0.1) + (math.pow(prestige, 0.6) * 0.2)
+	return 1.0 + ((targetPart - 1) * 0.05) + (prestige * 0.05)
 end
 
 local function GetActualStyle(plr)
@@ -171,7 +172,7 @@ local function StartBattle(player, encounterType, requestedPartId)
 		hpMult *= 1.3; dmgMult *= 1.25; dropMult *= 1.5 
 	elseif isPaths then
 		local floor = player:GetAttribute("PathsFloor") or 1
-		local pathScale = math.pow(1.10, floor - 1) 
+		local pathScale = 1.0 + (floor * 0.05) -- [[ THE FIX: Smooth Linear Paths Scaling ]]
 		hpMult = hpMult * (0.60 * pathScale) 
 		dmgMult = dmgMult * (1.10 * pathScale)
 		dropMult = 1.0 + (prestige * 0.25) + (floor * 0.1)
@@ -194,7 +195,6 @@ local function StartBattle(player, encounterType, requestedPartId)
 	local combinedAwakenedString = wpnAwakenedString .. " | " .. pathsAwakenedString
 	local awakenedStats = ParseAwakenedStats(combinedAwakenedString)
 
-	-- [[ HEALTH BUG FIX: Actually apply Clan HP Multiplier to Player max health ]]
 	local clanName = player:GetAttribute("Clan") or "None"
 	local isAwakenedClan = string.find(tostring(clanName or ""), "Awakened") ~= nil
 	local cStats = ClanData.GetClanStats(clanName, isAwakenedClan, player:GetAttribute("Titan"), false)
@@ -227,7 +227,6 @@ local function StartBattle(player, encounterType, requestedPartId)
 	local eDef = math.floor(eTemplate.Defense * dmgMult)
 	local eSpd = math.floor(eTemplate.Speed * spdMult)
 
-	-- [[ FIX: 1-SHOT & BOSS HP OVERHAUL (DYNAMIC ENCOUNTER CLAMPING) ]]
 	local isDynamicBoss = (encounterType == "EngageWorldBoss" or encounterType == "EngageNightmare" or encounterType == "EngageRaid")
 
 	if isDynamicBoss then
@@ -247,7 +246,6 @@ local function StartBattle(player, encounterType, requestedPartId)
 		elseif encounterType == "EngageNightmare" then baseDifficulty = 1.5
 		elseif encounterType == "EngageRaid" then baseDifficulty = 1.2 end
 
-		-- DYNAMIC HP: Math clamped heavily to prevent 200k HP bloat
 		local effectivePlayerDmg = math.max(10, pTotalStr * (awakenedStats.DmgMult or 1.0) * (1 + (prestige * 0.1)))
 		local bossHPRatio = math.clamp(eTemplate.Health / 4000, 0.5, 2.5) 
 		eHP = math.floor(effectivePlayerDmg * 15 * baseDifficulty * math.pow(groupMult, 0.75) * bossHPRatio)
@@ -259,10 +257,10 @@ local function StartBattle(player, encounterType, requestedPartId)
 			eGateHP = math.floor(eHP * gateRatio)
 		end
 
-		-- DYNAMIC LETHALITY: Capped ratio scaling prevents random 1-shots. Forces an 8-hit kill requirement.
+		-- [[ THE FIX: Force 10 hits to kill player, rather than 1-shots ]]
 		local effectivePlayerDurability = pMaxHP + (pTotalDef * 2)
-		local bossDmgRatio = math.clamp(eTemplate.Strength / 300, 0.5, 2.0) 
-		eStr = math.floor((effectivePlayerDurability / 8) * baseDifficulty * bossDmgRatio)
+		local bossDmgRatio = math.clamp(eTemplate.Strength / 300, 0.5, 1.5) 
+		eStr = math.floor((effectivePlayerDurability / 10) * baseDifficulty * bossDmgRatio)
 
 		local bossDefRatio = math.clamp(eTemplate.Defense / 150, 0.5, 2.0)
 		eDef = math.floor(pTotalStr * 0.5 * bossDefRatio * baseDifficulty)
@@ -396,7 +394,7 @@ local function ProcessEnemyDeath(player, battle)
 		local maxMemoryIndex = math.min(#EnemyData.PathsMemories, math.max(1, math.ceil((floor + 1) / 3)))
 		local nextEnemyTemplate = EnemyData.PathsMemories[math.random(1, maxMemoryIndex)]
 
-		local pathScale = math.pow(1.10, floor)
+		local pathScale = 1.0 + (floor * 0.05) -- [[ THE FIX: Smooth Linear Paths Scaling ]]
 		local hpMult = GetHPScale(1, prestige) * (0.60 * pathScale)
 		local dmgMult = GetDmgScale(1, prestige) * (1.10 * pathScale)
 		local spdMult = GetSpdScale(1, prestige)
@@ -570,7 +568,6 @@ local function ProcessEnemyDeath(player, battle)
 	end
 end
 
--- [[ FIX: Added Missing MinigameResult Handler Check ]]
 CombatAction.OnServerEvent:Connect(function(player, actionType, actionData)
 	if actionType == "EngageRandom" or actionType == "EngageStory" or actionType == "EngageEndless" or actionType == "EngagePaths" or actionType == "EngageWorldBoss" or actionType == "EngageNightmare" then 
 		local pId = actionData and (actionData.PartId or actionData.BossId) or nil; StartBattle(player, actionType, pId); return 
